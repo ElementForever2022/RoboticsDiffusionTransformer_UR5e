@@ -315,6 +315,8 @@ if __name__ == "__main__":
     print('AAA')
     print('AAA')
     print('AAA')
+    print('AAA')
+    print('AAA')
 ###################
 
     logger = get_logger(__name__)
