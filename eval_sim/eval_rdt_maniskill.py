@@ -53,7 +53,7 @@ task2lang = {
 
 env_id = args.env_id
 
-#####
+
 env = gym.make(
     env_id,
     obs_mode=args.obs_mode,
@@ -65,7 +65,7 @@ env = gym.make(
     viewer_camera_configs=dict(shader_pack=args.shader),
     sim_backend=args.sim_backend
 )
-#####
+
 
 config_path = 'configs/base.yaml'
 with open(config_path, "r") as fp:
