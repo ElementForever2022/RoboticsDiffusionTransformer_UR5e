@@ -299,6 +299,8 @@ if __name__ == "__main__":
     print("Hello world")
     print("Hello world")
     print("Hello world")
+    
+    print('123')
 
     logger = get_logger(__name__)
     args = parse_args()
