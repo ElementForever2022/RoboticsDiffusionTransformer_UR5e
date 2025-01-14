@@ -303,9 +303,9 @@ if __name__ == "__main__":
     print('123')
     
     print("456")
-
     for i in range(10):
         print(i)
+    print('collision solved')
 
     logger = get_logger(__name__)
     args = parse_args()
