@@ -1,7 +1,7 @@
 from typing import Callable, List, Type
 import sys
 sys.path.append('/')
-import gymnasium as gym
+# import gymnasium as gym # gym will not be used in real environment
 import numpy as np
 # from mani_skill.envs.sapien_env import BaseEnv
 # from mani_skill.utils import common, gym_utils
@@ -13,6 +13,9 @@ from collections import deque
 from PIL import Image
 import cv2
 
+from robotEnv import RobotEnv
+
+# parse arguments
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--env-id", type=str, default="PickCube-v1", help=f"Environment to run motion planning solver on. ")
@@ -43,6 +46,7 @@ torch.cuda.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
+# natual language description of the task
 task2lang = {
     "PegInsertionSide-v1": "Pick up a orange-white peg and insert the orange end into the box with a hole in it.",
     "PickCube-v1": "Grasp a red cube and move it to a target goal position.",
@@ -53,20 +57,24 @@ task2lang = {
 
 env_id = args.env_id
 
+# gym will not be used in real environment
+# env = gym.make(
+#     env_id,
+#     obs_mode=args.obs_mode,
+#     control_mode="pd_joint_pos",
+#     render_mode=args.render_mode,
+#     reward_mode="dense" if args.reward_mode is None else args.reward_mode,
+#     sensor_configs=dict(shader_pack=args.shader),
+#     human_render_camera_configs=dict(shader_pack=args.shader),
+#     viewer_camera_configs=dict(shader_pack=args.shader),
+#     sim_backend=args.sim_backend
+# )
 
-env = gym.make(
-    env_id,
-    obs_mode=args.obs_mode,
-    control_mode="pd_joint_pos",
-    render_mode=args.render_mode,
-    reward_mode="dense" if args.reward_mode is None else args.reward_mode,
-    sensor_configs=dict(shader_pack=args.shader),
-    human_render_camera_configs=dict(shader_pack=args.shader),
-    viewer_camera_configs=dict(shader_pack=args.shader),
-    sim_backend=args.sim_backend
-)
+# create robot object
+robotEnv = RobotEnv()
 
 
+# load models
 config_path = 'configs/base.yaml'
 with open(config_path, "r") as fp:
     config = yaml.safe_load(fp)
@@ -81,27 +89,39 @@ policy = create_model(
     pretrained_vision_encoder_name_or_path=pretrained_vision_encoder_name_or_path
 )
 
+# load text embed
 if os.path.exists(f'text_embed_{env_id}.pt'):
     text_embed = torch.load(f'text_embed_{env_id}.pt')
 else:
     text_embed = policy.encode_instruction(task2lang[env_id])
     torch.save(text_embed, f'text_embed_{env_id}.pt')
 
+# set max episode steps
 MAX_EPISODE_STEPS = 400 
 total_episodes = args.num_traj  
 success_count = 0  
 
-base_seed = 20241201
+# set base seed
+# base_seed = 20241201 # not used
 import tqdm
+# test loop
 for episode in tqdm.trange(total_episodes):
     obs_window = deque(maxlen=2)
-    obs, _ = env.reset(seed = episode + base_seed)
+    # obs, _ = env.reset(seed = episode + base_seed)
+    # let the robot reset to the initial state, and get the observed initial state of joints
+    observed_state = robotEnv.reset()
+
     policy.reset()
 
-    img = env.render().squeeze(0).detach().cpu().numpy()
+    # scenario shot by external camera
+    img = robotEnv.shootImage() # a image in np.array format
+    # img = env.render().squeeze(0).detach().cpu().numpy()
+
+    # observed images from cameras
     obs_window.append(None)
     obs_window.append(np.array(img))
-    proprio = obs['agent']['qpos'][:, :-1]
+    # proprio = obs['agent']['qpos'][:, :-1]
+    proprio = observed_state.clone() # proprio is the observed state of joints
 
     global_steps = 0
     video_frames = []
@@ -122,12 +142,16 @@ for episode in tqdm.trange(total_episodes):
         actions = actions[::4, :]
         for idx in range(actions.shape[0]):
             action = actions[idx]
-            obs, reward, terminated, truncated, info = env.step(action)
-            img = env.render().squeeze(0).detach().cpu().numpy()
+            # obs, reward, terminated, truncated, info = env.step(action)
+            observed_state, _reward, terminated, truncated, info = robotEnv.step(action)
+            # img = env.render().squeeze(0).detach().cpu().numpy()
+            img = robotEnv.shootImage()
             obs_window.append(img)
-            proprio = obs['agent']['qpos'][:, :-1]
+            proprio = observed_state.clone()
             video_frames.append(img)
             global_steps += 1
+
+            # check if the task is done
             if terminated or truncated:
                 assert "success" in info, sorted(info.keys())
                 if info['success']:

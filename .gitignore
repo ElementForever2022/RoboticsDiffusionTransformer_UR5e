@@ -182,3 +182,10 @@ wandb/
 # Distributed leaning
 hostfile.txt
 .deepspeed_env
+
+
+# ignore siglip
+siglip/
+
+# ignore images
+cam_and_arm/sample_image/
