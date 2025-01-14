@@ -301,6 +301,8 @@ if __name__ == "__main__":
     print("Hello world")
     
     print('123')
+    
+    print("456")
 
     for i in range(10):
         print(i)
