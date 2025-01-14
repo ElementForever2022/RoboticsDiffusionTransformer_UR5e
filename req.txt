@@ -91,7 +91,7 @@ nvidia-nccl-cu12==2.21.5
 nvidia-nvjitlink-cu12==12.4.127
 nvidia-nvtx-cu12==12.4.127
 omegaconf==2.3.0
-omnigibson==1.1.1
+#omnigibson==1.1.1
 opencv-python==4.9.0.80
 packaging==24.2
 parso==0.8.4
@@ -117,7 +117,7 @@ pyparsing==3.2.0
 pyperclip==1.9.0
 pyquaternion==0.9.9
 pyrealsense2==2.55.1.6486
-PyRep==4.1.0.3
+#PyRep==4.1.0.3
 pyserial==3.5
 pytest==8.3.4
 python-dateutil==2.9.0.post0
@@ -128,7 +128,7 @@ referencing==0.35.1
 regex==2024.11.6
 requests==2.28.1
 rich==13.9.4
-rlbench==1.2.0
+#rlbench==1.2.0
 rpds-py==0.22.3
 Rtree==1.2.0
 safetensors==0.4.5
@@ -165,7 +165,6 @@ typeguard==4.4.1
 typing_extensions==4.12.2
 tyro==0.9.5
 urllib3==1.26.13
-UrRtde @ file:///home/ur5/rdtkinova/cam_and_arm/rtde-2.7.2-release.zip#sha256=8ff7552d7cf3e33de37cd1f41513d7880e0fc58cead0a35034f8f7849d50ce44
 urx==0.11.0
 wandb==0.17.0
 wcwidth==0.2.13

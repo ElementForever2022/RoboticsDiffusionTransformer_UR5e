@@ -182,3 +182,7 @@ wandb/
 # Distributed leaning
 hostfile.txt
 .deepspeed_env
+
+
+# ignore siglip
+siglip/
