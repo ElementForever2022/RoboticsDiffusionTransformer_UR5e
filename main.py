@@ -302,6 +302,9 @@ if __name__ == "__main__":
     
     print('123')
 
+    for i in range(10):
+        print(i)
+
     logger = get_logger(__name__)
     args = parse_args()
     train(args, logger)
