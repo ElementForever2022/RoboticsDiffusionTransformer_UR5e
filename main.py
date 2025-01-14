@@ -310,6 +310,7 @@ if __name__ == "__main__":
     print('collision solved')
 
     print('AAA')
+    print('AAA')
 ###################
 
     logger = get_logger(__name__)
