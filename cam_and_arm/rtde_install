@@ -1,0 +1,35 @@
+使用rdtkinova环境
+进行以下操作：
+```bash
+pip install wheel
+```
+then copy "rtde-2.7.2-release.zip" to workspace
+```bash
+pip install rtde-2.7.2-release.zip
+```
+try to run the code
+```bash
+pip install pyserial
+pip install keyboard
+
+python reload.py
+```
+failure
+
+then we try to run example_control_loop.py
+```bash
+python example_control_loop.py
+```
+success
+
+then i try to run reload.py again
+```bash
+python reload.py
+```
+it might be the problem of the ip address
+
+the IP of the robot on the left is 192.168.1.201
+that on the right is 192.168.0.201
+
+then i try to run reload.py again
+success!
