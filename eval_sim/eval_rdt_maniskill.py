@@ -3,8 +3,8 @@ import sys
 sys.path.append('/')
 import gymnasium as gym
 import numpy as np
-from mani_skill.envs.sapien_env import BaseEnv
-from mani_skill.utils import common, gym_utils
+# from mani_skill.envs.sapien_env import BaseEnv
+# from mani_skill.utils import common, gym_utils
 import argparse
 import yaml
 from scripts.maniskill_model import create_model, RoboticDiffusionTransformerModel
@@ -52,6 +52,8 @@ task2lang = {
 }
 
 env_id = args.env_id
+
+#####
 env = gym.make(
     env_id,
     obs_mode=args.obs_mode,
@@ -63,6 +65,7 @@ env = gym.make(
     viewer_camera_configs=dict(shader_pack=args.shader),
     sim_backend=args.sim_backend
 )
+#####
 
 config_path = 'configs/base.yaml'
 with open(config_path, "r") as fp:
