@@ -296,6 +296,8 @@ def parse_args(input_args=None):
 
 if __name__ == "__main__":
     
+####################
+
     print("Hello world")
     print("Hello world")
     print("Hello world")
@@ -306,6 +308,9 @@ if __name__ == "__main__":
     for i in range(10):
         print(i)
     print('collision solved')
+
+    print('AAA')
+###################
 
     logger = get_logger(__name__)
     args = parse_args()
