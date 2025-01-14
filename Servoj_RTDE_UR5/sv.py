@@ -10,7 +10,14 @@ def list_to_setp(setp, list):
         setp.__dict__["input_double_register_%i" % i] = list[i]
     return setp
 
-ROBOT_HOST = '192.168.0.201'
+###右边的ur5的ip
+# ROBOT_HOST = '192.168.0.201'
+###
+
+# 左边的ur5的ip
+ROBOT_HOST = '192.168.1.201'
+
+
 ROBOT_PORT = 30004
 config_filename = 'control_loop_configuration.xml'
 
