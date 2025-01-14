@@ -296,8 +296,14 @@ def parse_args(input_args=None):
 
 if __name__ == "__main__":
     
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> dev2
     logger = get_logger(__name__)
     args = parse_args()
     train(args, logger)
+
+
+    
