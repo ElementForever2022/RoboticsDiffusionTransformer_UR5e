@@ -1,4 +1,43 @@
-class Environment:
+import pyrealsense2 as rs # to control the camera
+
+import os
+
+# Manager to control the cameras
+class Cameras:
+    def __init__(self):
+        # directory to save the images
+        save_dir = os.path.expanduser('/home/ur5/rdtkinova/cam_and_arm/save_image')
+        os.makedirs(save_dir, exist_ok=True) 
+
+        # 获取所有连接的设备
+        context = rs.context()
+        # 所有可连接设备的serial number
+        connected_devices = [d.get_info(rs.camera_info.serial_number) for d in context.devices]
+
+        # 将serial number映射到index
+        self.serial_number2index = {serial_number: index for index, serial_number in enumerate(connected_devices)}
+        # 将view映射到serial number
+        self.view2serial_number = {
+            'global': '244222076240',
+            'wrist': '233522079334'
+        }
+        # 将serial number映射到view
+        self.serial_number2view = {
+            '244222076240': 'global',
+            '233522079334': 'wrist'
+        }
+        
+    
+        self.global_camera = Camera(self.view2serial_number['global'])
+        self.wrist_camera = Camera(self.view2serial_number['wrist'])
+
+# camera class
+class Camera:
+    def __init__(self, serial_number):
+        self.serial_number = serial_number
+
+
+class RobotEnv:
     def __init__(self, env_id, obs_mode, control_mode, render_mode, reward_mode, 
                  sensor_configs, human_render_camera_configs, viewer_camera_configs, sim_backend):
         # 初始化真实机械臂环境
@@ -12,6 +51,11 @@ class Environment:
         self.viewer_camera_configs = viewer_camera_configs
         self.sim_backend = sim_backend
         # 其他初始化代码
+        
+        # initialize camera
+        # self.camera = Camera()
+        # TODO: 初始化相机
+
         pass
 
     def reset(self, seed=None):
@@ -77,7 +121,13 @@ class Environment:
         pass
 
     def shootImage(self):
+        """
         # 拍摄图像
 
         # 返回值: 一张图像 np格式 来自global相机
-        pass
+        """
+        # TODO: 拍摄图像
+
+
+if __name__ == "__main__":
+    camera = Camera()
