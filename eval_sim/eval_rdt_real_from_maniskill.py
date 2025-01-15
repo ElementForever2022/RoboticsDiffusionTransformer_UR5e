@@ -7,7 +7,7 @@ import numpy as np
 # from mani_skill.utils import common, gym_utils
 import argparse
 import yaml
-from scripts.maniskill_model import create_model, RoboticDiffusionTransformerModel
+from scripts.agilex_model_ur5_real import create_model, RoboticDiffusionTransformerModel
 import torch
 from collections import deque
 from PIL import Image

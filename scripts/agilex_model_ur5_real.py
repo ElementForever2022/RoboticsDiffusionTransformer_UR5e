@@ -1,3 +1,5 @@
+#添加了UR5的动作空间，修改了统一动作空间和具体设备（ur5）的动作空间互相转换的方法
+
 import os
 
 import numpy as np
@@ -22,6 +24,7 @@ AGILEX_STATE_INDICES = [
     STATE_VEC_IDX_MAPPING[f"right_gripper_open"]
 ]
 
+#TODO:是30-35还是33-39？
 #UR5的动作空间，先假设是 [33, 39): right end effector 6D pose
 UR5_AGILEX_STATE_INDICES = [
     STATE_VEC_IDX_MAPPING[f"right_eef_angle_{i}"] for i in range(6)
@@ -227,7 +230,6 @@ class RoboticDiffusionTransformerModel(object):
             [[[1, 1, 1, 1, 1, 1, 4.7908]]],
             device=eef.device, dtype=eef.dtype
         )
-        
         return eef
 
     @torch.no_grad()
