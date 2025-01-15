@@ -1,3 +1,5 @@
+#添加视频逻辑 
+
 from typing import Callable, List, Type
 import sys
 sys.path.append('/')
@@ -13,11 +15,15 @@ from collections import deque
 from PIL import Image
 import cv2
 
+###
+import os
+###
+
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--env-id", type=str, default="PickCube-v1", help=f"Environment to run motion planning solver on. ")
     parser.add_argument("-o", "--obs-mode", type=str, default="rgb", help="Observation mode to use. Usually this is kept as 'none' as observations are not necesary to be stored, they can be replayed later via the mani_skill.trajectory.replay_trajectory script.")
-    parser.add_argument("-n", "--num-traj", type=int, default=25, help="Number of trajectories to test.")
+    parser.add_argument("-n", "--num-traj", type=int, default=5, help="Number of trajectories to test.")
     parser.add_argument("--only-count-success", action="store_true", help="If true, generates trajectories until num_traj of them are successful and only saves the successful trajectories/videos")
     parser.add_argument("--reward-mode", type=str)
     parser.add_argument("-b", "--sim-backend", type=str, default="auto", help="Which simulation backend to use. Can be 'auto', 'cpu', 'gpu'")
@@ -106,7 +112,18 @@ for episode in tqdm.trange(total_episodes):
     success_time = 0
     done = False
 
+    ###
+    video_path = f'videos/episode_{episode+1}.mp4'
+    ###
+
     while global_steps < MAX_EPISODE_STEPS and not done:
+
+        ###
+        if global_steps == 0:
+            frame_height, frame_width, _ = img.shape
+            video_out = cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'mp4v'), 20.0, (frame_width, frame_height))
+        ###       
+        
         image_arrs = []
         for window_img in obs_window:
             image_arrs.append(window_img)
@@ -125,12 +142,26 @@ for episode in tqdm.trange(total_episodes):
             proprio = obs['agent']['qpos'][:, :-1]
             video_frames.append(img)
             global_steps += 1
+
+            ###
+            frame_path = f"frames/episode_{episode+1}_step_{global_steps}.png"
+            Image.fromarray(img).save(frame_path)
+            video_out.write(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+            ### 
+
+
+
             if terminated or truncated:
                 assert "success" in info, sorted(info.keys())
                 if info['success']:
                     success_count += 1
                     done = True
                     break 
+
+    ###
+    if video_out:
+        video_out.release()   
+    ###            
     print(f"Trial {episode+1} finished, success: {info['success']}, steps: {global_steps}")
 
 success_rate = success_count / total_episodes * 100
