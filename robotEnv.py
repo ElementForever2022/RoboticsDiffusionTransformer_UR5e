@@ -207,15 +207,7 @@ class ur5Robot:
         # 当前末端执行器位姿
         self.current_tcp_pose = None
 
-        # 夹爪打开/关闭的命令
-        self.MOTOR_OPEN_LIST = (0x02,0x00,0x20,0x49,0x20,0X00,0xC8) #机械爪松开(具体解释见机械爪用户手册)
-        self.MOTOR_CLOSE_LIST = (0x02,0x01,0x20,0x49,0x20,0X00,0xC8)    #机械爪闭合，45字节是角度
-        # 夹爪控制串口
-        self.ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
-        # 夹爪状态
-        self.gripper_state = 0.0 # 0.0表示夹爪打开，1.0表示夹爪关闭
-        # 默认先打开夹爪
-        self.ser.write(self.MOTOR_OPEN_LIST)
+        
         # 频率
         self.FREQUENCY = FREQUENCY
 
@@ -300,7 +292,7 @@ class ur5Robot:
         print(f"It took {time.time()-t_start}s to execute the servoJ to point 1")
         print('Final TCP pose:', self.con.receive().actual_TCP_pose)
 
-        self.stop(self.con)
+        self.stop()
 
         pass
     
@@ -403,10 +395,183 @@ class ur5Robot:
         """
         pass
 
+class Gripper:
+    def __init__(self, port='/dev/ttyUSB0', baudrate=9600, timeout=1):
+        self.ser = serial.Serial(port, baudrate, timeout=timeout) # control the gripper
+
+        # 夹爪速度
+        self.MAX_SPEED_42 = (0X01,0XA0) # 最快速度为42rad/s， 也就是01A0
+        self.AVER_SPEED_10 = (0X00,0XC8) # 平均速度为10rad/s， 也就是00C8
+
+        # 夹爪打开/关闭的命令
+        self.BYTE_OPEN = 0x00
+        self.BYTE_CLOSE = 0x01
+        self.MOTOR_OPEN_LIST = (0x02,self.BYTE_OPEN,0x20,0x49,0x20,*self.AVER_SPEED_10) #机械爪松开(最快速度为42rad/s， 也就是01A0)
+        self.MOTOR_CLOSE_LIST = (0x02,self.BYTE_CLOSE,0x20,0x49,0x20,*self.AVER_SPEED_10) #机械爪闭合
+        
+        # 夹爪状态
+        self.gripper_state = 0.0 # 0.0表示夹爪打开，1.0表示夹爪关闭
+        # 工作状态
+        self.working_state = 'ready' # 工作状态：ready表示待机，working表示工作
+        # 任务状态
+        self.task_start = None # 任务开始的闭合程度
+        self.task_end = None # 任务计划结束的闭合程度
+
+        # 任务时间管理
+        self.task_start_time = None # 任务开始时间
+
+        # 默认先打开夹爪
+        self.ser.write(self.MOTOR_OPEN_LIST)
+        # 等待夹爪打开
+        time.sleep(2)
+        print("Gripper initialized")
+    
+    def __del__(self):
+        self.ser.write(self.MOTOR_CLOSE_LIST)
+        self.ser.close()
+
+    @staticmethod
+    def rad2byte(rad):
+        """
+        将角度转换为字节
+        输出为高低位的10进制
+        """
+        output_dec = round(rad*10)
+        output_hex = format(output_dec, '04X') # 长度为4字符，使用0填充，大写16进制
+        high_byte = output_hex[:2]
+        low_byte = output_hex[2:]
+        return int(high_byte, 16), int(low_byte, 16)
+    @staticmethod
+    def gripper_state2rad(state):
+        """
+        将夹爪状态转换为角度
+        """
+        return state * 1872
+
+    def open(self):
+        self.__update_gripper_state()
+        if self.gripper_state != 0.0: # 如果夹爪状态为0.0，则夹爪已经打开
+            if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
+                self.working_state = 'working'
+                self.task_start = self.gripper_state
+                self.task_end = 0.0
+                self.task_start_time = time.time() # 任务开始时间
+                print('opening')
+                # self.ser.write(self.MOTOR_OPEN_LIST)
+                self.__open_byte(self.rad2byte(self.gripper_state2rad(1.0)))
+                # time.sleep(2)
+            else:
+                return
+        else:
+            # 如果夹爪状态为0.0，则夹爪已经打开
+            return
+        
+    def grasp(self):
+        self.__update_gripper_state()
+        if self.gripper_state == 0.0: # 如果夹爪状态为0.0，则夹爪已经打开
+            if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
+                self.working_state = 'working'
+                self.task_start = self.gripper_state
+                self.task_end = 0.0
+                self.task_start_time = time.time() # 任务开始时间
+                print('grasping')
+                # self.ser.write(self.MOTOR_OPEN_LIST)
+                self.__close_rad(self.gripper_state2rad(0.5))
+                # time.sleep(2)
+            else:
+                return
+        else:
+            # 如果夹爪状态为0.0，则夹爪已经打开
+            return
+
+
+    def close(self):
+        self.__update_gripper_state()
+        if self.gripper_state != 1.0: # 如果夹爪状态为1.0，则夹爪已经闭合
+            if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
+                self.working_state = 'working'
+                self.task_start = self.gripper_state
+                self.task_end = 0.5
+                self.task_start_time = time.time() # 任务开始时间
+                print('closing')
+                # self.ser.write(self.MOTOR_CLOSE_LIST)
+                self.__close_byte(self.rad2byte(self.gripper_state2rad(1.0)))
+                # time.sleep(2)
+            else:
+                return
+        else:
+            return
+        
+    def __update_gripper_state(self):
+        """
+        更新夹爪状态
+        """
+        current_time = time.time()
+        if self.task_start_time is not None:
+            if current_time - self.task_start_time >= 0.5:
+                self.working_state = 'ready'
+                if self.task_end == 0.0:
+                    self.gripper_state = 0.0
+                elif self.task_end == 0.5:
+                    self.gripper_state = 0.5
+                else:
+                    self.gripper_state = 1.0
+                self.task_start = None
+                self.task_end = None
+                self.task_start_time = None
+        
+    
+    def __close_rad(self, rad):
+        """
+        闭合指定角度
+        """
+        high_byte, low_byte = self.rad2byte(rad)
+        self.ser.write((0x02,self.BYTE_CLOSE,0x20,high_byte,low_byte,*self.MAX_SPEED_42))
+
+    def __open_rad(self, rad):
+        """
+        打开指定角度
+        """
+        high_byte, low_byte = self.rad2byte(rad)
+        self.ser.write((0x02,self.BYTE_OPEN,0x20,high_byte,low_byte,*self.MAX_SPEED_42))
+
+    def __close_byte(self, bytes):
+        """
+        闭合指定字节
+        """
+        self.ser.write((0x02,self.BYTE_CLOSE,0x20,*bytes,*self.MAX_SPEED_42))
+
+    def __open_byte(self, bytes):
+        """
+        打开指定字节
+        """
+        self.ser.write((0x02,self.BYTE_OPEN,0x20,*bytes,*self.MAX_SPEED_42))
+
+
 if __name__ == "__main__":
 
 
-    robot = ur5Robot()
+    # robot = ur5Robot('192.168.0.201')
 
-    target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
-    robot.move(target_pose,trajectory_time=8)
+    # target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
+    # robot.move(target_pose,trajectory_time=8)
+
+    gripper = Gripper()
+    time.sleep(5)
+    gripper.grasp()
+
+
+    # high_byte, low_byte = gripper.rad2byte(1800)
+    time.sleep(1)
+    gripper.close()
+    print(1)
+    time.sleep(1.5)
+    gripper.open()
+    print(2)
+    time.sleep(1.5)
+    gripper.close()
+    print(3)
+    time.sleep(1.5)
+    gripper.open()
+    print(4)
+    time.sleep(1.5)
