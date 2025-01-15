@@ -297,9 +297,6 @@ def parse_args(input_args=None):
 if __name__ == "__main__":
     
 
-    for i in range(10):
-        print(i)
-
     logger = get_logger(__name__)
     args = parse_args()
     train(args, logger)
