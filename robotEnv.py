@@ -8,10 +8,12 @@ import logging
 
 import sys
 import logging
-import rtde.rtde as rtde
-import rtde.rtde_config as rtde_config
+import Servoj_RTDE_UR5.rtde.rtde as rtde
+import Servoj_RTDE_UR5.rtde.rtde_config as rtde_config
 import time
 from Servoj_RTDE_UR5.min_jerk_planner_translation import PathPlanTranslation
+
+import serial # 控制夹爪使用的串口通信
 
 # Manager to control the cameras
 class Cameras:
@@ -189,8 +191,8 @@ class RobotEnv:
         return self.global_camera.get_rgb_frame()
 
 class ur5Robot:
-    def __init__(self, ip='192.168.1.201', port=30004, FREQUENCY=500,
-                 config_filename='control_loop_configuration.xml'):
+    def __init__(self, ip='192.168.0.201', port=30004, FREQUENCY=500,
+                 config_filename='Servoj_RTDE_UR5/control_loop_configuration.xml'):
         # UR5机械臂的基本参数
 
         # 连接机器人
@@ -205,9 +207,15 @@ class ur5Robot:
         # 当前末端执行器位姿
         self.current_tcp_pose = None
 
+        # 夹爪打开/关闭的命令
+        self.MOTOR_OPEN_LIST = (0x02,0x00,0x20,0x49,0x20,0X00,0xC8) #机械爪松开(具体解释见机械爪用户手册)
+        self.MOTOR_CLOSE_LIST = (0x02,0x01,0x20,0x49,0x20,0X00,0xC8)    #机械爪闭合，45字节是角度
+        # 夹爪控制串口
+        self.ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
         # 夹爪状态
-        self.gripper_state = 0      
-
+        self.gripper_state = 0.0 # 0.0表示夹爪打开，1.0表示夹爪关闭
+        # 默认先打开夹爪
+        self.ser.write(self.MOTOR_OPEN_LIST)
         # 频率
         self.FREQUENCY = FREQUENCY
 
@@ -230,7 +238,7 @@ class ur5Robot:
 
         #通信
         self.con.get_controller_version()
-        self.con.send_output_setup(self.state_names, self.state_types, self.FREQUENCY)
+        self.con.send_output_setup(self.setp_names, self.setp_types, self.FREQUENCY)
         self.setp = self.con.send_input_setup(self.setp_names, self.setp_types)
         self.watchdog = self.con.send_input_setup(self.watchdog_names, self.watchdog_types)
 
@@ -268,44 +276,47 @@ class ur5Robot:
     
     @staticmethod
     def list_to_setp(setp, list):
+        """
+        将列表转换为setp, 输入的setp是自己的setp属性
+        """
         for i in range(6):
             setp.__dict__[f"input_double_register_{i}"] = list[i]
         return setp
 
-    def stop(self, con):
+    def stop(self):
         """
         立即停止机械臂运动
         """
 
-        con.send_pause()
-        con.disconnect()
+        self.con.send_pause()
+        self.con.disconnect()
 
         pass
 
 #？？这个类下面的其他方法有没有用？
 
-    def move_j(self, joint_positions, speed=1.0, acceleration=1.0):
-        """
-        关节空间运动
-        Args:
-            joint_positions: 目标关节角度 [j1, j2, j3, j4, j5, j6]
-            speed: 运动速度比例 (0.0-1.0)
-            acceleration: 加速度比例 (0.0-1.0)
-        """
-        pass
+    # def move_j(self, joint_positions, speed=1.0, acceleration=1.0):
+    #     """
+    #     关节空间运动
+    #     Args:
+    #         joint_positions: 目标关节角度 [j1, j2, j3, j4, j5, j6]
+    #         speed: 运动速度比例 (0.0-1.0)
+    #         acceleration: 加速度比例 (0.0-1.0)
+    #     """
+    #     pass
 
 
 
-    def move_p(self, target_pose, speed=0.25, acceleration=0.5, blend_radius=0.05):
-        """
-        笛卡尔空间点到点运动（带圆弧过渡）
-        Args:
-            target_pose: 目标位姿 [x, y, z, rx, ry, rz]
-            speed: 运动速度 (m/s)
-            acceleration: 加速度 (m/s^2)
-            blend_radius: 圆弧过渡半径 (m)
-        """
-        pass
+    # def move_p(self, target_pose, speed=0.25, acceleration=0.5, blend_radius=0.05):
+    #     """
+    #     笛卡尔空间点到点运动（带圆弧过渡）
+    #     Args:
+    #         target_pose: 目标位姿 [x, y, z, rx, ry, rz]
+    #         speed: 运动速度 (m/s)
+    #         acceleration: 加速度 (m/s^2)
+    #         blend_radius: 圆弧过渡半径 (m)
+    #     """
+    #     pass
 
     def get_joint_positions(self):
         """
@@ -313,7 +324,9 @@ class ur5Robot:
         Returns:
             list: 当前关节角度 [j1, j2, j3, j4, j5, j6]
         """
-        return self.current_joint_positions
+        state = self.con.receive() # 获取当前状态
+        current_joint_positions = state.actual_q # 获取当前关节角度
+        return current_joint_positions
 
     def get_tcp_pose(self):
         """
@@ -321,17 +334,26 @@ class ur5Robot:
         Returns:
             list: 当前TCP位姿 [x, y, z, rx, ry, rz]
         """
-        return self.current_tcp_pose
+        state = self.con.receive() # 获取当前状态
+        current_tcp_pose = state.actual_TCP_pose # 获取当前末端执行器位姿
+        return current_tcp_pose
 
-    def control_gripper(self, open_state, speed=255):
+    def control_gripper(self, open_state, speed=1.0):
         """
         控制夹爪
         Args:
-            open_state: True表示打开，False表示关闭
-            speed: 夹爪速度 (0-255)
+            open_state: 0.0表示打开，1.0表示关闭
+            speed: 夹爪速度 (0-1)
         """
-        self.gripper_state = open_state
-        pass
+        prev_state = self.gripper_state # 获取当前夹爪状态
+        self.gripper_state = open_state # 设置夹爪新状态
+
+        # 夹爪状态发生变化时，发送命令
+        if prev_state != self.gripper_state:
+            if self.gripper_state == 0.0:
+                self.ser.write(self.MOTOR_OPEN_LIST)
+            else:
+                self.ser.write(self.MOTOR_CLOSE_LIST)
 
 
     def set_tcp(self, tcp_offset):
@@ -352,20 +374,27 @@ class ur5Robot:
         pass
 
 if __name__ == "__main__":
-    import cv2
-    cameras = Cameras()
+    # import cv2
+    # cameras = Cameras()
 
-    # 测试拍摄图像
-    global_camera = cameras.view2camera['global']
-    wrist_camera = cameras.view2camera['wrist']
-    while True:
-        global_rgb_frame = global_camera.get_rgb_frame()
-        wrist_rgb_frame = wrist_camera.get_rgb_frame()
+    # # 测试拍摄图像
+    # global_camera = cameras.view2camera['global']
+    # wrist_camera = cameras.view2camera['wrist']
+    # while True:
+    #     global_rgb_frame = global_camera.get_rgb_frame()
+    #     wrist_rgb_frame = wrist_camera.get_rgb_frame()
 
-        combined_frame = np.hstack((global_rgb_frame, wrist_rgb_frame))
+    #     combined_frame = np.hstack((global_rgb_frame, wrist_rgb_frame))
 
-        cv2.imshow('RGB Frame', combined_frame)
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            break
-    cv2.destroyAllWindows()
+    #     cv2.imshow('RGB Frame', combined_frame)
+    #     key = cv2.waitKey(1) & 0xFF
+    #     if key == ord('q'):
+    #         break
+    # cv2.destroyAllWindows()
+
+    robot = ur5Robot()
+    # for i in range(10):
+    #     robot.control_gripper(1.0)
+    #     time.sleep(2)
+        # robot.control_gripper(0.0)
+        # time.sleep(2)
