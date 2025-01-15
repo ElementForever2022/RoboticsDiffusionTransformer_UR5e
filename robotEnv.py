@@ -147,13 +147,17 @@ class RobotEnv:
     def step(self, action):
         # 执行动作并返回新的观测值、奖励、是否终止、是否截断和附加信息
 
-        # 根据action执行动作（核心）
+        #将action拆解为末端执行器位姿和夹爪状态
+        #TODO
+
+        # 根据末端执行器位姿，移动机械臂
+        self.robot.move(target_pose)
+
+        # 根据夹爪状态，控制夹爪
+        #TODO
 
 
-
-
-        # 更新环境状态
-
+        # 有用
         #返回观测值
         obs = {
             'agent': {
@@ -161,19 +165,22 @@ class RobotEnv:
             }
         }
 
+
         #没用，不用管
         reward = 0.0  # 奖励值，需要根据具体环境实现 （没用）
-
+        #没用
         #是否在这一步终止执行
         terminated = False  
         truncated = False  
-
+        # 没用
         #提示是否成功
+        #'success'的初始值是False，判断成功后设为True
         info = {
-            'success': False  # 是否成功，需要根据具体环境实现
+            'success': False  
         }
 
-        # 具体的动作执行和状态更新逻辑需要根据真实机械臂环境实现
+
+        # 目前只有obs有用
         return obs, reward, terminated, truncated, info
 
     def render(self):
@@ -300,7 +307,7 @@ class ur5Robot:
         print(f"It took {time.time()-t_start}s to execute the servoJ to point 1")
         print('Final TCP pose:', self.con.receive().actual_TCP_pose)
 
-        self.stop(self.con)
+        self.stop()
 
         pass
     
@@ -410,3 +417,7 @@ if __name__ == "__main__":
 
     target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
     robot.move(target_pose,trajectory_time=8)
+
+
+
+
