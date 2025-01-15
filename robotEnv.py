@@ -1,6 +1,8 @@
 import pyrealsense2 as rs # to control the camera
-
+import numpy as np
 import os
+
+import time
 
 # Manager to control the cameras
 class Cameras:
@@ -13,28 +15,57 @@ class Cameras:
         context = rs.context()
         # 所有可连接设备的serial number
         connected_devices = [d.get_info(rs.camera_info.serial_number) for d in context.devices]
+        print(connected_devices)
 
         # 将serial number映射到index
         self.serial_number2index = {serial_number: index for index, serial_number in enumerate(connected_devices)}
         # 将view映射到serial number
         self.view2serial_number = {
-            'global': '244222076240',
+            'global': '244222076140',
             'wrist': '233522079334'
         }
         # 将serial number映射到view
         self.serial_number2view = {
-            '244222076240': 'global',
+            '244222076140': 'global',
             '233522079334': 'wrist'
         }
         
-    
+        # initialize cameras
+        print('Initializing cameras...', end='')
         self.global_camera = Camera(self.view2serial_number['global'])
         self.wrist_camera = Camera(self.view2serial_number['wrist'])
+        time.sleep(2.5) # 等待相机初始化完成
+        print('done')
+        # 将view映射到camera对象
+        self.view2camera = {
+            'global': self.global_camera,
+            'wrist': self.wrist_camera
+        }
 
 # camera class
 class Camera:
     def __init__(self, serial_number):
         self.serial_number = serial_number
+
+        self.pipeline = rs.pipeline()
+        config = rs.config()
+        config.enable_device(self.serial_number)
+        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+        
+        self.pipeline.start(config)
+        
+    def get_rgb_frame(self):
+        frames = self.pipeline.wait_for_frames()
+        color_frame = frames.get_color_frame()
+        color_image = np.asanyarray(color_frame.get_data()) 
+        return color_image
+
+    def get_depth_frame(self):
+        frames = self.pipeline.wait_for_frames()
+        depth_frame = frames.get_depth_frame()
+        depth_image = np.asanyarray(depth_frame.get_data())
+        return depth_image
 
 
 class RobotEnv:
@@ -248,3 +279,23 @@ class ur5Robot:
             cog: 重心位置 [x, y, z]
         """
         pass
+
+if __name__ == "__main__":
+    import cv2
+    cameras = Cameras()
+    print(cameras.view2camera)
+
+    # 测试拍摄图像
+    global_camera = cameras.view2camera['global']
+    wrist_camera = cameras.view2camera['wrist']
+    while True:
+        global_rgb_frame = global_camera.get_rgb_frame()
+        wrist_rgb_frame = wrist_camera.get_rgb_frame()
+
+        combined_frame = np.hstack((global_rgb_frame, wrist_rgb_frame))
+
+        cv2.imshow('RGB Frame', combined_frame)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+    cv2.destroyAllWindows()
