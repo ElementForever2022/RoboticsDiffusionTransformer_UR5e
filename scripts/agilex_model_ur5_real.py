@@ -10,7 +10,7 @@ from models.multimodal_encoder.siglip_encoder import SiglipVisionTower
 from models.multimodal_encoder.t5_encoder import T5Embedder
 from models.rdt_runner import RDTRunner
 
-#动作空间。我们要的是右手的末端笛卡尔坐标和方向，还有夹爪，一共7个
+
 # The indices that the raw vector should be mapped to in the unified action vector
 AGILEX_STATE_INDICES = [
     STATE_VEC_IDX_MAPPING[f"left_arm_joint_{i}_pos"] for i in range(6)
@@ -20,6 +20,13 @@ AGILEX_STATE_INDICES = [
     STATE_VEC_IDX_MAPPING[f"right_arm_joint_{i}_pos"] for i in range(6)
 ] + [
     STATE_VEC_IDX_MAPPING[f"right_gripper_open"]
+]
+
+#UR5的动作空间，先假设是 [33, 39): right end effector 6D pose
+UR5_AGILEX_STATE_INDICES = [
+    STATE_VEC_IDX_MAPPING[f"right_eef_angle_{i}"] for i in range(6)
+] + [
+    STATE_VEC_IDX_MAPPING["right_gripper_open"]
 ]
 
 
