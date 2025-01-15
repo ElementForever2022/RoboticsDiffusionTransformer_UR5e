@@ -224,7 +224,7 @@ class ur5Robot:
 
         # 读取配置文件
         conf = rtde_config.ConfigFile(config_filename)
-        state_names, state_types = conf.get_recipe('state')
+        self.state_names, self.state_types = conf.get_recipe('state')
         self.setp_names, self.setp_types = conf.get_recipe('setp')
         self.watchdog_names, self.watchdog_types = conf.get_recipe('watchdog')
 
@@ -238,7 +238,7 @@ class ur5Robot:
 
         #通信
         self.con.get_controller_version()
-        self.con.send_output_setup(self.setp_names, self.setp_types, self.FREQUENCY)
+        self.con.send_output_setup(self.state_names, self.state_types, self.FREQUENCY)
         self.setp = self.con.send_input_setup(self.setp_names, self.setp_types)
         self.watchdog = self.con.send_input_setup(self.watchdog_names, self.watchdog_types)
 
