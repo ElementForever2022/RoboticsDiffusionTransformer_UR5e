@@ -1,3 +1,5 @@
+#添加了UR5的动作空间，修改了统一动作空间和具体设备（ur5）的动作空间互相转换的方法
+
 import os
 
 import numpy as np
@@ -10,7 +12,7 @@ from models.multimodal_encoder.siglip_encoder import SiglipVisionTower
 from models.multimodal_encoder.t5_encoder import T5Embedder
 from models.rdt_runner import RDTRunner
 
-#动作空间。我们要的是右手的末端笛卡尔坐标和方向，还有夹爪，一共7个
+
 # The indices that the raw vector should be mapped to in the unified action vector
 AGILEX_STATE_INDICES = [
     STATE_VEC_IDX_MAPPING[f"left_arm_joint_{i}_pos"] for i in range(6)
@@ -20,6 +22,20 @@ AGILEX_STATE_INDICES = [
     STATE_VEC_IDX_MAPPING[f"right_arm_joint_{i}_pos"] for i in range(6)
 ] + [
     STATE_VEC_IDX_MAPPING[f"right_gripper_open"]
+]
+
+
+#UR5的动作空间，共10位。手臂 30-39，3位位置，6位旋转。夹爪1
+UR5_AGILEX_STATE_INDICES =[
+    STATE_VEC_IDX_MAPPING["right_eef_pos_x"]
+] + [
+    STATE_VEC_IDX_MAPPING["right_eef_pos_y"]
+] +[
+    STATE_VEC_IDX_MAPPING["right_eef_pos_z"]
+] +[
+    STATE_VEC_IDX_MAPPING[f"right_eef_angle_{i}"] for i in range(6)
+] + [
+    STATE_VEC_IDX_MAPPING["right_gripper_open"]
 ]
 
 
@@ -161,62 +177,66 @@ class RoboticDiffusionTransformerModel(object):
 
         return pred
 
-    def _format_joint_to_state(self, joints):
+    def _format_joint_to_state(self, eef):
         """
-        Format the joint proprioception into the unified action vector.
+        Format the 6位eef位姿 into the unified action vector.
 
         Args:
-            joints (torch.Tensor): The joint proprioception to be formatted. 
-                qpos ([B, N, 14]).
+            eef (torch.Tensor): The 6位eef位姿 to be formatted. 
+                qpos ([B, N, 10]).
 
         Returns:
             state (torch.Tensor): The formatted vector for RDT ([B, N, 128]). 
         """
+
         # Rescale the gripper to the range of [0, 1]
-        joints = joints / torch.tensor(
-            [[[1, 1, 1, 1, 1, 1, 4.7908, 1, 1, 1, 1, 1, 1, 4.7888]]],
-            device=joints.device, dtype=joints.dtype
+        # TODO:要填入我们的夹爪数值，检查手臂的值
+        eef = eef / torch.tensor(
+            [[[1, 1, 1, 1, 1, 1, 1, 1, 1, 4.7908]]],
+            device=eef.device, dtype=eef.dtype
         )
         
-        B, N, _ = joints.shape
+        B, N, _ = eef.shape
         state = torch.zeros(
             (B, N, self.args["model"]["state_token_dim"]), 
-            device=joints.device, dtype=joints.dtype
+            device=eef.device, dtype=eef.dtype
         )
+
         # Fill into the unified state vector
-        state[:, :, AGILEX_STATE_INDICES] = joints
+        state[:, :, UR5_AGILEX_STATE_INDICES] = eef
         # Assemble the mask indicating each dimension's availability 
         state_elem_mask = torch.zeros(
             (B, self.args["model"]["state_token_dim"]),
-            device=joints.device, dtype=joints.dtype
+            device=eef.device, dtype=eef.dtype
         )
-        state_elem_mask[:, AGILEX_STATE_INDICES] = 1
+        state_elem_mask[:, UR5_AGILEX_STATE_INDICES] = 1
         return state, state_elem_mask
 
     def _unformat_action_to_joint(self, action):
         """
-        Unformat the unified action vector into the joint action to be executed.
+        Unformat the unified action vector into the eef action to be executed.
 
         Args:
             action (torch.Tensor): The unified action vector to be unformatted. 
                 ([B, N, 128])
         
         Returns:
-            joints (torch.Tensor): The unformatted robot joint action. 
-                qpos ([B, N, 14]).
+            eef (torch.Tensor): The unformatted robot eef action. 
+                qpos ([B, N, 10]).
         """
-        action_indices = AGILEX_STATE_INDICES
-        joints = action[:, :, action_indices]
+        action_indices = UR5_AGILEX_STATE_INDICES
+        eef = action[:, :, action_indices]
         
         # Rescale the gripper back to the action range
         # Note that the action range and proprioception range are different
         # for Mobile ALOHA robot
-        joints = joints * torch.tensor(
-            [[[1, 1, 1, 1, 1, 1, 11.8997, 1, 1, 1, 1, 1, 1, 13.9231]]],
-            device=joints.device, dtype=joints.dtype
+
+        # TODO:要填入我们的夹爪数值(检查rdt的夹爪部分的输出范围，把他弄到01之间)，检查手臂的值   
+        eef = eef * torch.tensor(
+            [[[1, 1, 1, 1, 1, 1, 1, 1, 1, 4.7908]]],
+            device=eef.device, dtype=eef.dtype
         )
-        
-        return joints
+        return eef
 
     @torch.no_grad()
     def step(self, proprio, images, text_embeds):

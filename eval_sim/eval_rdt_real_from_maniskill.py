@@ -7,11 +7,14 @@ import numpy as np
 # from mani_skill.utils import common, gym_utils
 import argparse
 import yaml
-from scripts.maniskill_model import create_model, RoboticDiffusionTransformerModel
+from scripts.agilex_model_ur5_real import create_model, RoboticDiffusionTransformerModel
 import torch
 from collections import deque
 from PIL import Image
 import cv2
+
+import keyboard
+
 
 from robotEnv import RobotEnv
 
@@ -106,13 +109,22 @@ success_count = 0
 import tqdm
 # test loop
 for episode in tqdm.trange(total_episodes):
+
+    #打印输出，提示当前是总共几次实验中的第几次实验
+    print(f"当前是总共{total_episodes}次评估中的第{episode+1}次")
+
     obs_window = deque(maxlen=2)
-    # obs, _ = env.reset(seed = episode + base_seed)
+
+    # obs, _ = robotEnv.reset()
     # let the robot reset to the initial state, and get the observed initial state of joints
+    
+    # 重置机器人环境
     observed_state = robotEnv.reset()
 
+    # 重置模型
     policy.reset()
 
+    # 拍摄
     # scenario shot by external camera
     img = robotEnv.shootImage() # a image in np.array format
     # img = env.render().squeeze(0).detach().cpu().numpy()
@@ -123,12 +135,22 @@ for episode in tqdm.trange(total_episodes):
     # proprio = obs['agent']['qpos'][:, :-1]
     proprio = observed_state.clone() # proprio is the observed state of joints
 
+    #当前评估中已经走过的步数
     global_steps = 0
+
     video_frames = []
 
+    #？没用
+    #当前已经成功了几次评估
     success_time = 0
+
+    #当前评估是否成功   
+    ifSuccess = False
+
+    #是否结束当前评估
     done = False
 
+    #跑一次评估，需要多步
     while global_steps < MAX_EPISODE_STEPS and not done:
         image_arrs = []
         for window_img in obs_window:
@@ -137,13 +159,22 @@ for episode in tqdm.trange(total_episodes):
             image_arrs.append(None)
         images = [Image.fromarray(arr) if arr is not None else None
                   for arr in image_arrs]
+        
+        # 模型推理
         actions = policy.step(proprio, images, text_embed).squeeze(0).cpu().numpy()
         # Take 8 steps since RDT is trained to predict interpolated 64 steps(actual 14 steps)
+
+        #推理获得一个动作数组
         actions = actions[::4, :]
+
+        # 执行动作数组中的每一个动作
         for idx in range(actions.shape[0]):
             action = actions[idx]
             # obs, reward, terminated, truncated, info = env.step(action)
+
+            #执行
             observed_state, _reward, terminated, truncated, info = robotEnv.step(action)
+
             # img = env.render().squeeze(0).detach().cpu().numpy()
             img = robotEnv.shootImage()
             obs_window.append(img)
@@ -151,14 +182,34 @@ for episode in tqdm.trange(total_episodes):
             video_frames.append(img)
             global_steps += 1
 
-            # check if the task is done
-            if terminated or truncated:
-                assert "success" in info, sorted(info.keys())
-                if info['success']:
-                    success_count += 1
-                    done = True
-                    break 
-    print(f"Trial {episode+1} finished, success: {info['success']}, steps: {global_steps}")
+            #仿真环境中任务有成功条件，可以自动判断成功。但实机中需要人为判断是否成功
+            # # check if the task is done
+            # if terminated or truncated:
+            #     assert "success" in info, sorted(info.keys())
+            #     if info['success']:
+            #         success_count += 1
+            #         done = True
+            #         break 
+
+            # 判断是否成功
+            #在外部人为判断是否成功，如果已经判断成功则键盘按下s，如果已经判断失败则键盘按下f
+
+            #我不要等待键盘输入，我要实时判断是否成功
+
+            # 使用keyboard库实时检测键盘输入
+            
+            if keyboard.is_pressed('s'):  # 检测's'键是否被按下
+                success_count += 1
+                ifSuccess = True
+                done = True
+                break
+            elif keyboard.is_pressed('f'):  # 检测'f'键是否被按下 
+                ifSuccess = False
+                done = True
+                break
+
+
+    print(f"Trial {episode+1} finished, success: {ifSuccess}, steps: {global_steps}")
 
 success_rate = success_count / total_episodes * 100
 print(f"Success rate: {success_rate}%")

@@ -15,6 +15,12 @@ from Servoj_RTDE_UR5.min_jerk_planner_translation import PathPlanTranslation
 
 import serial # 控制夹爪使用的串口通信
 
+# from docs.test_6drot import compute_ortho6d_from_rotation_matrix
+# from docs.test_6drot import convert_euler_to_rotation_matrix
+from docs.test_6drot import compute_rotation_matrix_from_ortho6d
+from docs.test_6drot import convert_rotation_matrix_to_euler
+
+
 # Manager to control the cameras
 class Cameras:
     def __init__(self):
@@ -145,15 +151,31 @@ class RobotEnv:
         pass
 
     def step(self, action):
-        # 执行动作并返回新的观测值、奖励、是否终止、是否截断和附加信息
+        #输入：action，模型生成的。3位末端位置，6位末端旋转，1位夹爪状态
+    
 
-        # 根据action执行动作（核心）
+        #TODO：将action拆解为3部分，末端位置，末端旋转（ortho6d），夹爪状态
 
 
+        #6位末端旋转-》3位末端旋转（UR5要使用）
+        ortho6d = [[-0.14754878, -0.98858915,  0.0303456,  -0.46593792,  0.09654019,  0.87953501]]#仅做测试，代替从模型的输入
+        print(f"6D Rotation: {ortho6d}")
+        rotmat_recovered = compute_rotation_matrix_from_ortho6d(ortho6d)
+        euler_recovered = convert_rotation_matrix_to_euler(rotmat_recovered)
+        print(f"Recovered Euler angles: {euler_recovered}")
 
 
-        # 更新环境状态
+        #TODO:合并3位末端位置和3位末端旋转为target_pose
 
+
+        # 根据末端执行器位姿（3位末端位置，3位末端旋转），移动机械臂
+        self.robot.move(target_pose)
+
+        # TODO:根据夹爪状态，控制夹爪
+
+
+        #TODO:获取并返回观测值
+        
         #返回观测值
         obs = {
             'agent': {
@@ -161,19 +183,22 @@ class RobotEnv:
             }
         }
 
+
         #没用，不用管
         reward = 0.0  # 奖励值，需要根据具体环境实现 （没用）
-
+        #没用
         #是否在这一步终止执行
         terminated = False  
         truncated = False  
-
+        # 没用
         #提示是否成功
+        #'success'的初始值是False，判断成功后设为True
         info = {
-            'success': False  # 是否成功，需要根据具体环境实现
+            'success': False  
         }
 
-        # 具体的动作执行和状态更新逻辑需要根据真实机械臂环境实现
+
+        # 目前只有obs有用
         return obs, reward, terminated, truncated, info
 
     def render(self):
@@ -619,7 +644,6 @@ if __name__ == "__main__":
 
 
     # robot = ur5Robot('192.168.0.201')
-
     # target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
     # robot.move(target_pose,trajectory_time=8)
 
@@ -656,3 +680,6 @@ if __name__ == "__main__":
         time.sleep(5)
         gripper.close()
         time.sleep(5)
+
+    # target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
+    # robot.move(target_pose,trajectory_time=8)

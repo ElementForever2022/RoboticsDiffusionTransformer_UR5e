@@ -82,6 +82,7 @@ def compute_ortho6d_from_rotation_matrix(matrix):
 
 
 # Test
+# TODO:欧拉-》旋转矩阵-》ortho6d-》靠近模型
 if __name__ == "__main__":
     # Randomly generate a euler ange
     euler = np.random.rand(3) * 2 * np.pi - np.pi
