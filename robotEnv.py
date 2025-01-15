@@ -191,7 +191,7 @@ class RobotEnv:
         return self.global_camera.get_rgb_frame()
 
 class ur5Robot:
-    def __init__(self, ip='192.168.0.201', port=30004, FREQUENCY=500,
+    def __init__(self, ip='192.168.1.201', port=30004, FREQUENCY=500,
                  config_filename='Servoj_RTDE_UR5/control_loop_configuration.xml'):
         # UR5机械臂的基本参数
 
@@ -199,7 +199,7 @@ class ur5Robot:
         self.ip = ip
         self.port = port
         
-        #?
+        #?没用
         self.joint_num = 6  # UR5有6个关节
 
         # 当前关节位置  
@@ -238,7 +238,7 @@ class ur5Robot:
 
         #通信
         self.con.get_controller_version()
-        self.con.send_output_setup(self.state_names, self.state_types, self.FREQUENCY)
+        self.con.send_output_setup(self.state_names, self.state_types, self.FREQUENCY)  
         self.setp = self.con.send_input_setup(self.setp_names, self.setp_types)
         self.watchdog = self.con.send_input_setup(self.watchdog_names, self.watchdog_types)
 
@@ -257,7 +257,7 @@ class ur5Robot:
          
 
     
-    def move(self, target_pose, config_filename, trajectory_time=2, speed=0.25, acceleration=0.5):
+    def move(self, target_pose, trajectory_time=2, speed=0.25, acceleration=0.5):
         """
         笛卡尔空间直线运动
         Args:
@@ -268,9 +268,39 @@ class ur5Robot:
             acceleration: 加速度 (m/s^2)
         """
 
-        logging.getLogger().setLevel(logging.INFO)
+        #获取当前末端执行器位姿
+        state = self.con.receive()
+        tcp = state.actual_TCP_pose
+        orientation_const = tcp[3:]
 
+        #打印
+        print("Current TCP pose:", tcp)
+        print("-------Executing servoJ to point 1 -----------\n")
+                
+        #指定伺服模式
+        self.watchdog.input_int_register_0 = 2
+        self.con.send(self.watchdog)
 
+        # 路径规划器
+        planner = PathPlanTranslation(tcp, target_pose, trajectory_time)
+
+        # 动
+        t_start = time.time()
+        while time.time() - t_start < trajectory_time:
+            state = self.con.receive()
+            t_current = time.time() - t_start
+
+            if state.runtime_state > 1 and t_current <= trajectory_time:
+                position_ref, lin_vel_ref, acceleration_ref = planner.trajectory_planning(t_current)
+                pose = position_ref.tolist() + orientation_const
+                self.list_to_setp(self.setp, pose)
+                self.con.send(self.setp)
+
+        # 打印
+        print(f"It took {time.time()-t_start}s to execute the servoJ to point 1")
+        print('Final TCP pose:', self.con.receive().actual_TCP_pose)
+
+        self.stop(self.con)
 
         pass
     
@@ -374,27 +404,9 @@ class ur5Robot:
         pass
 
 if __name__ == "__main__":
-    # import cv2
-    # cameras = Cameras()
 
-    # # 测试拍摄图像
-    # global_camera = cameras.view2camera['global']
-    # wrist_camera = cameras.view2camera['wrist']
-    # while True:
-    #     global_rgb_frame = global_camera.get_rgb_frame()
-    #     wrist_rgb_frame = wrist_camera.get_rgb_frame()
-
-    #     combined_frame = np.hstack((global_rgb_frame, wrist_rgb_frame))
-
-    #     cv2.imshow('RGB Frame', combined_frame)
-    #     key = cv2.waitKey(1) & 0xFF
-    #     if key == ord('q'):
-    #         break
-    # cv2.destroyAllWindows()
 
     robot = ur5Robot()
-    # for i in range(10):
-    #     robot.control_gripper(1.0)
-    #     time.sleep(2)
-        # robot.control_gripper(0.0)
-        # time.sleep(2)
+
+    target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
+    robot.move(target_pose,trajectory_time=8)
