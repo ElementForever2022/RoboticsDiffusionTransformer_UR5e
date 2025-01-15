@@ -400,14 +400,18 @@ class Gripper:
         self.ser = serial.Serial(port, baudrate, timeout=timeout) # control the gripper
 
         # 夹爪速度
-        self.MAX_SPEED_42 = (0X01,0XA0) # 最快速度为42rad/s， 也就是01A0
+        self.MAX_SPEED_42 = (0X01,0X40) # 最快速度为42rad/s， 也就是01A0
         self.AVER_SPEED_10 = (0X00,0XC8) # 平均速度为10rad/s， 也就是00C8
 
         # 夹爪打开/关闭的命令
         self.BYTE_OPEN = 0x00
         self.BYTE_CLOSE = 0x01
-        self.MOTOR_OPEN_LIST = (0x02,self.BYTE_OPEN,0x20,0x49,0x20,*self.AVER_SPEED_10) #机械爪松开(最快速度为42rad/s， 也就是01A0)
-        self.MOTOR_CLOSE_LIST = (0x02,self.BYTE_CLOSE,0x20,0x49,0x20,*self.AVER_SPEED_10) #机械爪闭合
+        # self.MOTOR_OPEN_LIST = (0x02,self.BYTE_OPEN,0x20,0x49,0x20,*self.AVER_SPEED_10) #机械爪松开(最快速度为42rad/s， 也就是01A0)
+        # self.MOTOR_CLOSE_LIST = (0x02,self.BYTE_CLOSE,0x20,0x49,0x20,*self.AVER_SPEED_10) #机械爪闭合
+
+        # 机械爪90%张开闭合
+        self.MOTOR_OPEN_LIST = (0x02,self.BYTE_OPEN,0x20,0x43,0x14,*self.AVER_SPEED_10) #机械爪松开(最快速度为42rad/s， 也就是01A0)
+        self.MOTOR_CLOSE_LIST = (0x02,self.BYTE_CLOSE,0x20,0x43,0x14,*self.AVER_SPEED_10) #机械爪闭合
         
         # 夹爪状态
         self.gripper_state = 0.0 # 0.0表示夹爪打开，1.0表示夹爪关闭
@@ -436,7 +440,7 @@ class Gripper:
         将角度转换为字节
         输出为高低位的10进制
         """
-        output_dec = round(rad*10)
+        output_dec = round(rad/3.14*180*10)
         output_hex = format(output_dec, '04X') # 长度为4字符，使用0填充，大写16进制
         high_byte = output_hex[:2]
         low_byte = output_hex[2:]
@@ -444,13 +448,14 @@ class Gripper:
     @staticmethod
     def gripper_state2rad(state):
         """
-        将夹爪状态转换为角度
+        将夹爪状态转换为弧度
         """
-        return state * 1872
+        return state * 3.14*2*5.2
 
     def open(self):
         self.__update_gripper_state()
-        if self.gripper_state != 0.0: # 如果夹爪状态为0.0，则夹爪已经打开
+        if self.gripper_state == 1.0: # 如果夹爪状态为1.0，则夹爪已经闭合
+
             if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
                 self.working_state = 'working'
                 self.task_start = self.gripper_state
@@ -458,12 +463,25 @@ class Gripper:
                 self.task_start_time = time.time() # 任务开始时间
                 print('opening')
                 # self.ser.write(self.MOTOR_OPEN_LIST)
-                self.__open_byte(self.rad2byte(self.gripper_state2rad(1.0)))
+                self.__open_byte(self.rad2byte(self.gripper_state2rad(0.8)))
+                # time.sleep(2)
+            else:
+                return
+        elif self.gripper_state == 0.5:
+            if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
+                self.working_state = 'working'
+                self.task_start = self.gripper_state
+                self.task_end = 0.0
+                self.task_start_time = time.time() # 任务开始时间
+                print('opening')
+                # self.ser.write(self.MOTOR_OPEN_LIST)
+                self.__open_byte(self.rad2byte(self.gripper_state2rad(0.4)),speedType='AVER')
                 # time.sleep(2)
             else:
                 return
         else:
             # 如果夹爪状态为0.0，则夹爪已经打开
+            print('gripper is already opened')
             return
         
     def grasp(self):
@@ -472,11 +490,23 @@ class Gripper:
             if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
                 self.working_state = 'working'
                 self.task_start = self.gripper_state
-                self.task_end = 0.0
+                self.task_end = 0.5
                 self.task_start_time = time.time() # 任务开始时间
-                print('grasping')
+                print('grasping from open')
                 # self.ser.write(self.MOTOR_OPEN_LIST)
-                self.__close_rad(self.gripper_state2rad(0.5))
+                self.__close_rad(self.gripper_state2rad(0.4),speedType='AVER')
+                # time.sleep(2)
+            else:
+                return
+        elif self.gripper_state == 1.0:
+            if self.working_state == 'ready':
+                self.working_state = 'working'
+                self.task_start = self.gripper_state
+                self.task_end = 0.5
+                self.task_start_time = time.time() # 任务开始时间
+                print('grasping from close')
+                # self.ser.write(self.MOTOR_OPEN_LIST)
+                self.__open_rad(self.gripper_state2rad(0.4),speedType='AVER')
                 # time.sleep(2)
             else:
                 return
@@ -487,19 +517,32 @@ class Gripper:
 
     def close(self):
         self.__update_gripper_state()
-        if self.gripper_state != 1.0: # 如果夹爪状态为1.0，则夹爪已经闭合
+        if self.gripper_state == 0.0: # 如果夹爪状态为1.0，则夹爪已经闭合
             if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
                 self.working_state = 'working'
                 self.task_start = self.gripper_state
-                self.task_end = 0.5
+                self.task_end = 1.0
                 self.task_start_time = time.time() # 任务开始时间
                 print('closing')
                 # self.ser.write(self.MOTOR_CLOSE_LIST)
-                self.__close_byte(self.rad2byte(self.gripper_state2rad(1.0)))
+                self.__close_byte(self.rad2byte(self.gripper_state2rad(0.8)))
+                # time.sleep(2)
+            else:
+                return
+        elif self.gripper_state == 0.5:
+            if self.working_state == 'ready': # 如果工作状态为ready，则夹爪可以工作
+                self.working_state = 'working'
+                self.task_start = self.gripper_state
+                self.task_end = 1.0
+                self.task_start_time = time.time() # 任务开始时间
+                print('closing')
+                # self.ser.write(self.MOTOR_CLOSE_LIST)
+                self.__close_byte(self.rad2byte(self.gripper_state2rad(0.4)),speedType='AVER')
                 # time.sleep(2)
             else:
                 return
         else:
+            print('gripper is already closed')
             return
         
     def __update_gripper_state(self):
@@ -508,7 +551,7 @@ class Gripper:
         """
         current_time = time.time()
         if self.task_start_time is not None:
-            if current_time - self.task_start_time >= 0.5:
+            if current_time - self.task_start_time >= 3:
                 self.working_state = 'ready'
                 if self.task_end == 0.0:
                     self.gripper_state = 0.0
@@ -521,31 +564,55 @@ class Gripper:
                 self.task_start_time = None
         
     
-    def __close_rad(self, rad):
+    def __close_rad(self, rad,speedType='MAX'):
         """
         闭合指定角度
+        Args:
+            rad: 角度
+            speedType: 速度类型，'MAX'表示最大速度，'AVER'表示平均速度
         """
-        high_byte, low_byte = self.rad2byte(rad)
-        self.ser.write((0x02,self.BYTE_CLOSE,0x20,high_byte,low_byte,*self.MAX_SPEED_42))
+        high_byte, low_byte = self.rad2byte(rad)    
+        if speedType == 'MAX':
+            self.ser.write((0x02,self.BYTE_CLOSE,0x20,high_byte,low_byte,*self.MAX_SPEED_42))
+        elif speedType == 'AVER':
+            self.ser.write((0x02,self.BYTE_CLOSE,0x20,high_byte,low_byte,*self.AVER_SPEED_10))
 
-    def __open_rad(self, rad):
+    def __open_rad(self, rad,speedType='MAX'):
         """
         打开指定角度
+        Args:
+            rad: 角度
+            speedType: 速度类型，'MAX'表示最大速度，'AVER'表示平均速度
         """
         high_byte, low_byte = self.rad2byte(rad)
-        self.ser.write((0x02,self.BYTE_OPEN,0x20,high_byte,low_byte,*self.MAX_SPEED_42))
+        if speedType == 'MAX':
+            self.ser.write((0x02,self.BYTE_OPEN,0x20,high_byte,low_byte,*self.MAX_SPEED_42))
+        elif speedType == 'AVER':
+            self.ser.write((0x02,self.BYTE_OPEN,0x20,high_byte,low_byte,*self.AVER_SPEED_10))
 
-    def __close_byte(self, bytes):
+    def __close_byte(self, bytes,speedType='MAX'):
         """
         闭合指定字节
+        Args:
+            bytes: 字节
+            speedType: 速度类型，'MAX'表示最大速度，'AVER'表示平均速度
         """
-        self.ser.write((0x02,self.BYTE_CLOSE,0x20,*bytes,*self.MAX_SPEED_42))
+        if speedType == 'MAX':
+            self.ser.write((0x02,self.BYTE_CLOSE,0x20,*bytes,*self.MAX_SPEED_42))
+        elif speedType == 'AVER':
+            self.ser.write((0x02,self.BYTE_CLOSE,0x20,*bytes,*self.AVER_SPEED_10))
 
-    def __open_byte(self, bytes):
+    def __open_byte(self, bytes,speedType='MAX'):
         """
         打开指定字节
+        Args:
+            bytes: 字节
+            speedType: 速度类型，'MAX'表示最大速度，'AVER'表示平均速度
         """
-        self.ser.write((0x02,self.BYTE_OPEN,0x20,*bytes,*self.MAX_SPEED_42))
+        if speedType == 'MAX':
+            self.ser.write((0x02,self.BYTE_OPEN,0x20,*bytes,*self.MAX_SPEED_42))
+        elif speedType == 'AVER':
+            self.ser.write((0x02,self.BYTE_OPEN,0x20,*bytes,*self.AVER_SPEED_10))
 
 
 if __name__ == "__main__":
@@ -557,21 +624,35 @@ if __name__ == "__main__":
     # robot.move(target_pose,trajectory_time=8)
 
     gripper = Gripper()
+    print(gripper.rad2byte(5.3*3.14*2*0.9))
     time.sleep(5)
     gripper.grasp()
+    print(0)
 
 
     # high_byte, low_byte = gripper.rad2byte(1800)
-    time.sleep(1)
+    time.sleep(5)
     gripper.close()
     print(1)
-    time.sleep(1.5)
+    time.sleep(5)
     gripper.open()
     print(2)
-    time.sleep(1.5)
+    time.sleep(5)
     gripper.close()
     print(3)
-    time.sleep(1.5)
+    time.sleep(5)
     gripper.open()
     print(4)
-    time.sleep(1.5)
+    time.sleep(5)
+
+    for i in range(10):
+        gripper.close()
+        time.sleep(5)
+        gripper.grasp()
+        time.sleep(5)
+        gripper.open()
+        time.sleep(5)
+        gripper.grasp()
+        time.sleep(5)
+        gripper.close()
+        time.sleep(5)
