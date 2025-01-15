@@ -4,6 +4,15 @@ import os
 
 import time
 
+import logging
+
+import sys
+import logging
+import rtde.rtde as rtde
+import rtde.rtde_config as rtde_config
+import time
+from Servoj_RTDE_UR5.min_jerk_planner_translation import PathPlanTranslation
+
 # Manager to control the cameras
 class Cameras:
     def __init__(self):
@@ -180,7 +189,8 @@ class RobotEnv:
         return self.global_camera.get_rgb_frame()
 
 class ur5Robot:
-    def __init__(self, ip, port):
+    def __init__(self, ip='192.168.1.201', port=30004, FREQUENCY=500,
+                 config_filename='control_loop_configuration.xml'):
         # UR5机械臂的基本参数
 
         # 连接机器人
@@ -196,16 +206,80 @@ class ur5Robot:
         self.current_tcp_pose = None
 
         # 夹爪状态
-        self.gripper_state = 0  
+        self.gripper_state = 0      
+
+        # 频率
+        self.FREQUENCY = FREQUENCY
+
+        # 日志
+        logging.getLogger().setLevel(logging.INFO)
+
+        # 读取配置文件
+        conf = rtde_config.ConfigFile(config_filename)
+        state_names, state_types = conf.get_recipe('state')
+        self.setp_names, self.setp_types = conf.get_recipe('setp')
+        self.watchdog_names, self.watchdog_types = conf.get_recipe('watchdog')
+
+        # 连接
+        self.con = rtde.RTDE(self.ip, self.port)
+        connection_state = self.con.connect()
+        while connection_state != 0:
+            time.sleep(0.5)
+            connection_state = self.con.connect()
+        print("---------------Successfully connected to the robot-------------\n")
+
+        #通信
+        self.con.get_controller_version()
+        self.con.send_output_setup(self.state_names, self.state_types, self.FREQUENCY)
+        self.setp = self.con.send_input_setup(self.setp_names, self.setp_types)
+        self.watchdog = self.con.send_input_setup(self.watchdog_names, self.watchdog_types)
+
+        #初始化寄存器
+        self.setp.input_double_register_0 = 0
+        self.setp.input_double_register_1 = 0
+        self.setp.input_double_register_2 = 0
+        self.setp.input_double_register_3 = 0
+        self.setp.input_double_register_4 = 0
+        self.setp.input_double_register_5 = 0
+        self.setp.input_bit_registers0_to_31 = 0
+
+        #连不上就退出
+        if not self.con.send_start():
+            sys.exit()   
+         
+
     
-    def move_l(self, target_pose, speed=0.25, acceleration=0.5):
+    def move(self, target_pose, config_filename, trajectory_time=2, speed=0.25, acceleration=0.5):
         """
         笛卡尔空间直线运动
         Args:
             target_pose: 目标位姿 [x, y, z, rx, ry, rz]
+            trajectory_time: 运动时间 (s)
+
             speed: 运动速度 (m/s)
             acceleration: 加速度 (m/s^2)
         """
+
+        logging.getLogger().setLevel(logging.INFO)
+
+
+
+        pass
+    
+    @staticmethod
+    def list_to_setp(setp, list):
+        for i in range(6):
+            setp.__dict__[f"input_double_register_{i}"] = list[i]
+        return setp
+
+    def stop(self, con):
+        """
+        立即停止机械臂运动
+        """
+
+        con.send_pause()
+        con.disconnect()
+
         pass
 
 #？？这个类下面的其他方法有没有用？
@@ -259,11 +333,6 @@ class ur5Robot:
         self.gripper_state = open_state
         pass
 
-    def stop(self):
-        """
-        立即停止机械臂运动
-        """
-        pass
 
     def set_tcp(self, tcp_offset):
         """

@@ -10,11 +10,14 @@ def list_to_setp(setp, list):
         setp.__dict__[f"input_double_register_{i}"] = list[i]
     return setp
 
+
 ROBOT_HOST = '192.168.1.201'
 ROBOT_PORT = 30004
 config_filename = 'control_loop_configuration.xml'
 FREQUENCY = 500
 desired_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
+trajectory_time = 8
+
 
 
 logging.getLogger().setLevel(logging.INFO)
@@ -59,7 +62,6 @@ print("-------Executing servoJ to point 1 -----------\n")
 watchdog.input_int_register_0 = 2
 con.send(watchdog)
 
-trajectory_time = 8
 planner = PathPlanTranslation(tcp, desired_pose, trajectory_time)
 orientation_const = tcp[3:]
 
