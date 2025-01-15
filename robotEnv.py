@@ -15,23 +15,23 @@ class Cameras:
         context = rs.context()
         # 所有可连接设备的serial number
         connected_devices = [d.get_info(rs.camera_info.serial_number) for d in context.devices]
-        print(connected_devices)
+        print('Connected devices:', connected_devices)
 
         # 将serial number映射到index
         self.serial_number2index = {serial_number: index for index, serial_number in enumerate(connected_devices)}
         # 将view映射到serial number
         self.view2serial_number = {
-            'global': '244222076140',
-            'wrist': '233522079334'
+            'global': connected_devices[0],
+            'wrist': connected_devices[1]
         }
         # 将serial number映射到view
         self.serial_number2view = {
-            '244222076140': 'global',
-            '233522079334': 'wrist'
+            connected_devices[0]: 'global',
+            connected_devices[1]: 'wrist'
         }
         
         # initialize cameras
-        print('Initializing cameras...', end='')
+        print('Initializing cameras...')
         self.global_camera = Camera(self.view2serial_number['global'])
         self.wrist_camera = Camera(self.view2serial_number['wrist'])
         time.sleep(2.5) # 等待相机初始化完成
@@ -283,7 +283,6 @@ class ur5Robot:
 if __name__ == "__main__":
     import cv2
     cameras = Cameras()
-    print(cameras.view2camera)
 
     # 测试拍摄图像
     global_camera = cameras.view2camera['global']
