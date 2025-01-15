@@ -24,9 +24,15 @@ AGILEX_STATE_INDICES = [
     STATE_VEC_IDX_MAPPING[f"right_gripper_open"]
 ]
 
-#TODO:是30-35还是33-39？
-#UR5的动作空间，先假设是 [33, 39): right end effector 6D pose
-UR5_AGILEX_STATE_INDICES = [
+
+#UR5的动作空间，共10位。手臂 30-39，3位位置，6位旋转。夹爪1
+UR5_AGILEX_STATE_INDICES =[
+    STATE_VEC_IDX_MAPPING["right_eef_pos_x"]
+] + [
+    STATE_VEC_IDX_MAPPING["right_eef_pos_y"]
+] +[
+    STATE_VEC_IDX_MAPPING["right_eef_pos_z"]
+] +[
     STATE_VEC_IDX_MAPPING[f"right_eef_angle_{i}"] for i in range(6)
 ] + [
     STATE_VEC_IDX_MAPPING["right_gripper_open"]
@@ -177,7 +183,7 @@ class RoboticDiffusionTransformerModel(object):
 
         Args:
             eef (torch.Tensor): The 6位eef位姿 to be formatted. 
-                qpos ([B, N, 7]).
+                qpos ([B, N, 10]).
 
         Returns:
             state (torch.Tensor): The formatted vector for RDT ([B, N, 128]). 
@@ -186,7 +192,7 @@ class RoboticDiffusionTransformerModel(object):
         # Rescale the gripper to the range of [0, 1]
         # TODO:要填入我们的夹爪数值，检查手臂的值
         eef = eef / torch.tensor(
-            [[[1, 1, 1, 1, 1, 1, 4.7908]]],
+            [[[1, 1, 1, 1, 1, 1, 1, 1, 1, 4.7908]]],
             device=eef.device, dtype=eef.dtype
         )
         
@@ -216,7 +222,7 @@ class RoboticDiffusionTransformerModel(object):
         
         Returns:
             eef (torch.Tensor): The unformatted robot eef action. 
-                qpos ([B, N, 7]).
+                qpos ([B, N, 10]).
         """
         action_indices = UR5_AGILEX_STATE_INDICES
         eef = action[:, :, action_indices]
@@ -225,9 +231,9 @@ class RoboticDiffusionTransformerModel(object):
         # Note that the action range and proprioception range are different
         # for Mobile ALOHA robot
 
-        # TODO:要填入我们的夹爪数值，检查手臂的值   
+        # TODO:要填入我们的夹爪数值(检查rdt的夹爪部分的输出范围，把他弄到01之间)，检查手臂的值   
         eef = eef * torch.tensor(
-            [[[1, 1, 1, 1, 1, 1, 4.7908]]],
+            [[[1, 1, 1, 1, 1, 1, 1, 1, 1, 4.7908]]],
             device=eef.device, dtype=eef.dtype
         )
         return eef

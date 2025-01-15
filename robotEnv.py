@@ -15,6 +15,12 @@ from Servoj_RTDE_UR5.min_jerk_planner_translation import PathPlanTranslation
 
 import serial # 控制夹爪使用的串口通信
 
+# from docs.test_6drot import compute_ortho6d_from_rotation_matrix
+# from docs.test_6drot import convert_euler_to_rotation_matrix
+from docs.test_6drot import compute_rotation_matrix_from_ortho6d
+from docs.test_6drot import convert_rotation_matrix_to_euler
+
+
 # Manager to control the cameras
 class Cameras:
     def __init__(self):
@@ -145,19 +151,31 @@ class RobotEnv:
         pass
 
     def step(self, action):
-        # 执行动作并返回新的观测值、奖励、是否终止、是否截断和附加信息
+        #输入：action，模型生成的。3位末端位置，6位末端旋转，1位夹爪状态
+    
 
-        #将action拆解为末端执行器位姿和夹爪状态
-        #TODO
+        #TODO：将action拆解为3部分，末端位置，末端旋转（ortho6d），夹爪状态
 
-        # 根据末端执行器位姿，移动机械臂
+
+        #6位末端旋转-》3位末端旋转（UR5要使用）
+        ortho6d = [[-0.14754878, -0.98858915,  0.0303456,  -0.46593792,  0.09654019,  0.87953501]]#仅做测试，代替从模型的输入
+        print(f"6D Rotation: {ortho6d}")
+        rotmat_recovered = compute_rotation_matrix_from_ortho6d(ortho6d)
+        euler_recovered = convert_rotation_matrix_to_euler(rotmat_recovered)
+        print(f"Recovered Euler angles: {euler_recovered}")
+
+
+        #TODO:合并3位末端位置和3位末端旋转为target_pose
+
+
+        # 根据末端执行器位姿（3位末端位置，3位末端旋转），移动机械臂
         self.robot.move(target_pose)
 
-        # 根据夹爪状态，控制夹爪
-        #TODO
+        # TODO:根据夹爪状态，控制夹爪
 
 
-        # 有用
+        #TODO:获取并返回观测值
+        
         #返回观测值
         obs = {
             'agent': {
