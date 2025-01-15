@@ -188,5 +188,14 @@ hostfile.txt
 siglip/
 
 # ignore images
+
+
 frames/
 videos/
+
+
+cam_and_arm/sample_image/
+
+
+cam_and_arm/save_image
+
