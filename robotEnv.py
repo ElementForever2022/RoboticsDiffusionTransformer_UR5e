@@ -97,9 +97,11 @@ class RobotEnv:
         # 其他初始化代码
         
         # initialize camera
-        # self.camera = Camera()
-        # TODO: 初始化相机
+        self.cameras = Cameras()
+        self.view2camera = self.cameras.view2camera # 将view映射到camera对象
 
+        self.global_camera = self.view2camera['global']
+        self.wrist_camera = self.view2camera['wrist']
 
         #？？？pass干什么的？
         pass
@@ -167,7 +169,7 @@ class RobotEnv:
         # 渲染当前环境状态
 
         # 返回值: 一张图像 来自global相机
-        pass
+        return self.global_camera.get_rgb_frame()
 
     def shootImage(self):
         """
@@ -175,7 +177,7 @@ class RobotEnv:
 
         # 返回值: 一张图像 np格式 来自global相机
         """
-        # TODO: 拍摄图像
+        return self.global_camera.get_rgb_frame()
 
 class ur5Robot:
     def __init__(self, ip, port):
