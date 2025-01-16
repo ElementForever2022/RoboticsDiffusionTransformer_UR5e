@@ -20,6 +20,11 @@ import serial # 控制夹爪使用的串口通信
 from docs.test_6drot import compute_rotation_matrix_from_ortho6d
 from docs.test_6drot import convert_rotation_matrix_to_euler
 
+import torch
+
+from docs.test_6drot import compute_ortho6d_from_rotation_matrix    
+from docs.test_6drot import convert_euler_to_rotation_matrix
+
 
 # Manager to control the cameras
 class Cameras:
@@ -86,22 +91,9 @@ class Camera:
 
 
 class RobotEnv:
-    def __init__(self, env_id, obs_mode, control_mode, render_mode, reward_mode, 
-                 sensor_configs, human_render_camera_configs, viewer_camera_configs, sim_backend, ip, port):
+    def __init__(self, ip='192.168.0.201', port=30004):
         
-
-        # 初始化真实机械臂环境
-
-        # 一些是仿真环境相关，没用
-        self.env_id = env_id
-        self.obs_mode = obs_mode
-        self.control_mode = control_mode
-        self.render_mode = render_mode
-        self.reward_mode = reward_mode
-        self.sensor_configs = sensor_configs
-        self.human_render_camera_configs = human_render_camera_configs
-        self.viewer_camera_configs = viewer_camera_configs
-        self.sim_backend = sim_backend
+         # 初始化真实机械臂环境
 
 
         # 连接机器人    
@@ -124,18 +116,45 @@ class RobotEnv:
         pass
 
     def reset(self, seed=None):
-
         # 重置环境到初始状态
 
-        #？？？真实环境的reset需要随机种子？
-        # 使用提供的种子来初始化随机数生成器
-        if seed is not None:
-            # 设置随机种子
-            pass  # 具体实现取决于环境的随机性控制
+        #当前末端执行器位姿
+        tcp_pose=self.robot.get_tcp_pose()
+        print(f"Initial tcp_pose: {tcp_pose}")
 
+        #取出tcp_pose的3位末端旋转
+        rot_eff=tcp_pose[3:]
+        print(f"Initial rot_eff: {rot_eff}")
+
+        #将3位欧拉形式的末端旋转升一维以方便计算
+        rot_eff = rot_eff[None, :]    
+        print(f"Input rot_eff up 1 dimension: {rot_eff}")
+    
+        #转换为旋转矩阵
+        rotmat = convert_euler_to_rotation_matrix(rot_eff)
+        #转换为ortho6d
+        ortho6d = compute_ortho6d_from_rotation_matrix(rotmat)
+        print(f"Initial ortho6d up 1 dimension: {ortho6d}")
+
+        #将ortho6d的维度降一维
+        ortho6d = ortho6d.squeeze(0)
+        print(f"Initial ortho6d down 1 dimension: {ortho6d}")
+
+        #将当前末端执行器位姿和ortho6d合并为target_pose
+        target_pose=np.concatenate([tcp_pose[:3], ortho6d])
+        print(f"Initial target_pose: {target_pose}")
+
+        #当前夹爪状态
+        gripper_state=self.robot.get_gripper_state()
+        print(f"Initial gripper_state: {gripper_state}")
+
+        #将target_pose和gripper_state合并为initial_observation
+        initial_observation =np.concatenate([target_pose, gripper_state])
+        print(f"Initial action: {initial_observation}")
+
+        initial_observation = torch.tensor(initial_observation, dtype=torch.float32)
 
         # 返回初始观测值和其他可能的初始化信息
-        initial_observation = None  # 需要根据具体环境实现
         additional_info = None  # 可能的其他信息 (外面的调用不需要)
         
         return initial_observation, additional_info
@@ -162,7 +181,7 @@ class RobotEnv:
 
 
         #6位末端旋转-》3位末端旋转（UR5要使用）
-        ortho6d = [[-0.14754878, -0.98858915,  0.0303456,  -0.46593792,  0.09654019,  0.87953501]]#仅做测试，代替从模型的输入
+        ortho6d = rot_eff#仅做测试，代替从模型的输入
         print(f"6D Rotation: {ortho6d}")
         rotmat_recovered = compute_rotation_matrix_from_ortho6d(ortho6d)
         euler_recovered = convert_rotation_matrix_to_euler(rotmat_recovered)
@@ -223,7 +242,7 @@ class RobotEnv:
         return self.global_camera.get_rgb_frame()
 
 class ur5Robot:
-    def __init__(self, ip='192.168.1.201', port=30004, FREQUENCY=500,
+    def __init__(self, ip='192.168.0.201', port=30004, FREQUENCY=500,
                  config_filename='Servoj_RTDE_UR5/control_loop_configuration.xml'):
         # UR5机械臂的基本参数
 
