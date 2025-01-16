@@ -354,10 +354,12 @@ class ur5Robot:
         """
         控制夹爪
         """
-        if gripper_state == 0:
-            self.gripper.open()
-        elif gripper_state == 1:
+        dist_1 = abs(gripper_state - 1)
+        dist_0 = abs(gripper_state - 0)
+        if dist_1 < dist_0:
             self.gripper.grasp()
+        elif dist_0 < dist_1:
+            self.gripper.close()
         else:
             print(f"Invalid gripper state:{gripper_state}")
 
