@@ -110,6 +110,7 @@ for episode in tqdm.trange(total_episodes):
     obs_window.append(None)
     obs_window.append(np.array(img))
     proprio = obs['agent']['qpos'][:, :-1]
+    print(f"Initial proprio: {proprio}")
 
     global_steps = 0
     video_frames = []
