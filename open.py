@@ -8,5 +8,5 @@ motor_close_list =  (0x02,0x01,0x20,0x49,0x20,0X00,0xC8)
 
 ser.write(motor_open_list)
 time.sleep(5)
-# ser.write(motor_close_list)
+ser.write(motor_close_list)
 # time.sleep(5)
