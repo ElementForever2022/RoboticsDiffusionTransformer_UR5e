@@ -154,7 +154,10 @@ class RobotEnv:
         #输入：action，模型生成的。3位末端位置，6位末端旋转，1位夹爪状态
     
 
-        #TODO：将action拆解为3部分，末端位置，末端旋转（ortho6d），夹爪状态
+        # 将action拆解为3部分，末端位置，末端旋转（ortho6d），夹爪状态
+        pos_eff = action[:3] # 末端位置
+        rot_eff = action[3:9] # 末端旋转
+        gripper_state = action[9] # 夹爪状态
 
 
         #6位末端旋转-》3位末端旋转（UR5要使用）
@@ -165,23 +168,26 @@ class RobotEnv:
         print(f"Recovered Euler angles: {euler_recovered}")
 
 
-        #TODO:合并3位末端位置和3位末端旋转为target_pose
+        # 合并3位末端位置和3位末端旋转为target_pose
+        target_pose = np.concatenate([pos_eff, rot_eff])
 
 
         # 根据末端执行器位姿（3位末端位置，3位末端旋转），移动机械臂
-        # self.robot.move(target_pose)
+        self.robot.move(target_pose)
 
-        # TODO:根据夹爪状态，控制夹爪
+        # 根据夹爪状态，控制夹爪
+        self.robot.gripper_control(gripper_state)
 
 
-        #TODO:获取并返回观测值
-        
+        # 获取并返回观测值(关节状态proprio)
+        proprio = self.robot.get_joint_positions()
         #返回观测值
-        obs = {
-            'agent': {
-                'qpos': None  # 需要根据具体环境实现，应该是一个包含关节位置的数组
-            }
-        }
+        # obs = {
+        #     'agent': {
+        #         'qpos': None  # 需要根据具体环境实现，应该是一个包含关节位置的数组
+        #     }
+        # }
+        obs = np.concatenate([proprio.copy(), gripper_state])
 
 
         #没用，不用管
@@ -223,6 +229,9 @@ class ur5Robot:
         # 连接机器人
         self.ip = ip
         self.port = port
+
+        # 夹爪
+        self.gripper = Gripper()
         
         #?没用
         self.joint_num = 6  # UR5有6个关节
@@ -339,6 +348,18 @@ class ur5Robot:
         self.con.disconnect()
 
         pass
+
+
+    def gripper_control(self, gripper_state):
+        """
+        控制夹爪
+        """
+        if gripper_state == 0:
+            self.gripper.open()
+        elif gripper_state == 1:
+            self.gripper.grasp()
+        else:
+            print(f"Invalid gripper state:{gripper_state}")
 
 #？？这个类下面的其他方法有没有用？
 
