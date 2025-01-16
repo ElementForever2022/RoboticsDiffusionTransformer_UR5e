@@ -20,15 +20,25 @@ class RDTRunner(
     def __init__(self, *, action_dim, pred_horizon, config, 
                  lang_token_dim, img_token_dim, state_token_dim, 
                  max_lang_cond_len, img_cond_len, lang_pos_embed_config=None, 
-                 img_pos_embed_config=None, dtype=torch.bfloat16):
+                 img_pos_embed_config=None, dtype=torch.bfloat16, model_size="1B"):
         super(RDTRunner, self).__init__()
         # Create diffusion model
-        hidden_size = config['rdt']['hidden_size']
+
+
+        if model_size == "1B":
+            hidden_size = config['rdt']['hidden_size']
+            depth = config['rdt']['depth']
+        elif model_size == "170M":
+            hidden_size = config['rdt']['hidden_size']//2
+            depth = config['rdt']['depth']//2
+        else:
+            raise ValueError(f"Unknown model size: {model_size}")
+
         self.model = RDT(
             output_dim=action_dim,
             horizon=pred_horizon,
             hidden_size=hidden_size,
-            depth=config['rdt']['depth'],
+            depth=depth,
             num_heads=config['rdt']['num_heads'],
             max_lang_cond_len=max_lang_cond_len,
             img_cond_len=img_cond_len,

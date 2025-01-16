@@ -20,8 +20,21 @@ MANISKILL_INDICES = [
 
 def create_model(args, pretrained, **kwargs):
     model = RoboticDiffusionTransformerModel(args, **kwargs)
+
+    if '170' in pretrained:
+        model_size = "170M"
+    else:
+        model_size = "1B"
+
     if pretrained is not None:
-        model.load_pretrained_weights(pretrained)
+        if pretrained.endswith('.pt'):
+            model.load_pretrained_weights(pretrained,model_size)
+        elif pretrained.endswith('.bin'):
+            # weights = torch.load(pretrained)
+            # model.load_state_dict(weights)
+            model.load_pretrained_weights(pretrained,model_size)
+        else:
+            raise NotImplementedError(f"Unknown checkpoint format: {pretrained}")
     return model
 
 
@@ -123,6 +136,9 @@ class RoboticDiffusionTransformerModel(object):
         if filename.endswith('.pt'):
             checkpoint =  torch.load(pretrained)
             self.policy.load_state_dict(checkpoint["module"])
+        elif filename.endswith('.bin'):
+            weights = torch.load(pretrained)
+            self.policy.load_state_dict(weights)
         elif filename.endswith('.safetensors'):
             from safetensors.torch import load_model
             load_model(self.policy, pretrained)
