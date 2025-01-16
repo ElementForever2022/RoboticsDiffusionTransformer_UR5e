@@ -169,7 +169,7 @@ class RobotEnv:
 
 
         # 根据末端执行器位姿（3位末端位置，3位末端旋转），移动机械臂
-        self.robot.move(target_pose)
+        # self.robot.move(target_pose)
 
         # TODO:根据夹爪状态，控制夹爪
 

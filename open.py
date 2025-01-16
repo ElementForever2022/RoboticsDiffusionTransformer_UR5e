@@ -10,3 +10,6 @@ ser.write(motor_open_list)
 time.sleep(5)
 ser.write(motor_close_list)
 time.sleep(5)
+
+
+
