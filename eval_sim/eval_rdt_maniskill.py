@@ -145,7 +145,7 @@ for episode in tqdm.trange(total_episodes):
             #输出当前动作
             print(f"action: {action}")
             #任务的所有动作保存到文件，当前不存在这个文件则创建
-            file_name = f"actions/e_6.txt"
+            file_name = f"actions/e_7.txt"
             with open(file_name, "a") as f:
                 f.write(str(action))
                 

@@ -275,7 +275,7 @@ class RoboticDiffusionTransformerModel(object):
 
         ###
         # 输出trajectory到一个文件中。如果文件中有内容则不覆盖，往后记
-        file_name = f"actions/trajectory_6.txt"
+        file_name = f"actions/trajectory_7.txt"
         # 检查文件是否存在,如果不存在则创建
         os.makedirs(os.path.dirname(file_name), exist_ok=True)
         # 设置打印选项以显示完整的张量
