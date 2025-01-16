@@ -189,3 +189,5 @@ siglip/
 
 # ignore images
 cam_and_arm/sample_image/
+
+open.py
