@@ -272,6 +272,22 @@ class RoboticDiffusionTransformerModel(object):
             action_mask=state_elem_mask.unsqueeze(1),  
             ctrl_freqs=ctrl_freqs
         )
+
+        ###
+        # 输出trajectory到一个文件中。如果文件中有内容则不覆盖，往后记
+        file_name = f"actions/trajectory_6.txt"
+        # 检查文件是否存在,如果不存在则创建
+        os.makedirs(os.path.dirname(file_name), exist_ok=True)
+        # 设置打印选项以显示完整的张量
+        torch.set_printoptions(threshold=torch.inf)
+        # 以追加模式打开文件
+        with open(file_name, 'a') as f:
+            # 将trajectory写入文件
+            f.write(str(trajectory) + '\n')
+        # 恢复默认打印选项
+        torch.set_printoptions(threshold=1000)
+        ###
+
         trajectory = self._unformat_action_to_joint(trajectory).to(torch.float32)
 
         return trajectory

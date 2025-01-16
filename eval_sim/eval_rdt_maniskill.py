@@ -23,7 +23,11 @@ def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--env-id", type=str, default="PickCube-v1", help=f"Environment to run motion planning solver on. ")
     parser.add_argument("-o", "--obs-mode", type=str, default="rgb", help="Observation mode to use. Usually this is kept as 'none' as observations are not necesary to be stored, they can be replayed later via the mani_skill.trajectory.replay_trajectory script.")
-    parser.add_argument("-n", "--num-traj", type=int, default=5, help="Number of trajectories to test.")
+    
+    ###评估重复执行次数
+    parser.add_argument("-n", "--num-traj", type=int, default=1, help="Number of trajectories to test.")
+    
+
     parser.add_argument("--only-count-success", action="store_true", help="If true, generates trajectories until num_traj of them are successful and only saves the successful trajectories/videos")
     parser.add_argument("--reward-mode", type=str)
     parser.add_argument("-b", "--sim-backend", type=str, default="auto", help="Which simulation backend to use. Can be 'auto', 'cpu', 'gpu'")
@@ -136,6 +140,19 @@ for episode in tqdm.trange(total_episodes):
         actions = actions[::4, :]
         for idx in range(actions.shape[0]):
             action = actions[idx]
+
+            ###
+            #输出当前动作
+            print(f"action: {action}")
+            #任务的所有动作保存到文件，当前不存在这个文件则创建
+            file_name = f"actions/e_6.txt"
+            with open(file_name, "a") as f:
+                f.write(str(action))
+                
+            ###
+
+
+
             obs, reward, terminated, truncated, info = env.step(action)
             img = env.render().squeeze(0).detach().cpu().numpy()
             obs_window.append(img)
