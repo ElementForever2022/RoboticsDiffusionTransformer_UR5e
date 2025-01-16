@@ -78,7 +78,7 @@ env_id = args.env_id
 # )
 
 # create robot object
-robotEnv = RobotEnv()
+robotEnv = RobotEnv(ip='192.168.0.201', port=30004)
 
 
 # load models
@@ -123,8 +123,8 @@ for episode in tqdm.trange(total_episodes):
     # let the robot reset to the initial state, and get the observed initial state of joints
     
     # 重置机器人环境
-    observed_state = robotEnv.reset()
-
+    observed_state, _ = robotEnv.reset()
+    print(f"Initial observed_state: {observed_state}")
     # 重置模型
     policy.reset()
 
@@ -137,7 +137,9 @@ for episode in tqdm.trange(total_episodes):
     obs_window.append(None)
     obs_window.append(np.array(img))
     # proprio = obs['agent']['qpos'][:, :-1]
+    
     proprio = observed_state.clone() # proprio is the observed state of joints
+    print(f"Initial proprio: {proprio}")
 
     #当前评估中已经走过的步数
     global_steps = 0

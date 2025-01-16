@@ -65,14 +65,20 @@ class RoboticDiffusionTransformerModel(object):
         control_frequency=25,
         pretrained=None,
         pretrained_vision_encoder_name_or_path=None,
+        pretrained_text_encoder_name_or_path=None,
     ):
         self.args = args
         self.dtype = dtype
         self.image_size = image_size
         self.device = device
         self.control_frequency = control_frequency
+
+        ###
         # We do not use the text encoder due to limited GPU memory
-        # self.text_tokenizer, self.text_model = self.get_text_encoder(pretrained_text_encoder_name_or_path)
+        # 使用t5-v1_1-xxl作为文本编码器 
+        self.text_tokenizer, self.text_model = self.get_text_encoder(pretrained_text_encoder_name_or_path)
+        ###
+
         self.image_processor, self.vision_model = self.get_vision_encoder(pretrained_vision_encoder_name_or_path)
         self.policy = self.get_policy(pretrained)
         
