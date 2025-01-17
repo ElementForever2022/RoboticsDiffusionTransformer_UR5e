@@ -126,9 +126,13 @@ class RobotEnv:
         rot_eff=tcp_pose[3:]
         print(f"Initial rot_eff: {rot_eff}")
 
+        #将rot_eff的格式从list转换为np
+        rot_eff=np.array(rot_eff)
+        print(f"Initial rot_eff np: {rot_eff}")
+
         #将3位欧拉形式的末端旋转升一维以方便计算
         rot_eff = rot_eff[None, :]    
-        print(f"Input rot_eff up 1 dimension: {rot_eff}")
+        print(f"Initial rot_eff up 1 dimension: {rot_eff}")
     
         #转换为旋转矩阵
         rotmat = convert_euler_to_rotation_matrix(rot_eff)
@@ -145,11 +149,11 @@ class RobotEnv:
         print(f"Initial target_pose: {target_pose}")
 
         #当前夹爪状态
-        gripper_state=self.robot.get_gripper_state()
+        gripper_state=self.robot.gripper.gripper_state
         print(f"Initial gripper_state: {gripper_state}")
 
         #将target_pose和gripper_state合并为initial_observation
-        initial_observation =np.concatenate([target_pose, gripper_state])
+        initial_observation =np.concatenate([target_pose, np.array([gripper_state])])
         print(f"Initial action: {initial_observation}")
 
         initial_observation = torch.tensor(initial_observation, dtype=torch.float32)
@@ -169,7 +173,7 @@ class RobotEnv:
         # 返回值: 动作
         pass
 
-    def step(self, action):
+    def step(self, action,initial_step=False):
         #输入：action，模型生成的。3位末端位置，6位末端旋转，1位夹爪状态
     
 
@@ -182,6 +186,7 @@ class RobotEnv:
 
         #6位末端旋转-》3位末端旋转（UR5要使用）
         ortho6d = rot_eff#仅做测试，代替从模型的输入
+        ortho6d = ortho6d[None, :] # 升高维度
         print(f"6D Rotation: {ortho6d}")
         rotmat_recovered = compute_rotation_matrix_from_ortho6d(ortho6d)
         euler_recovered = convert_rotation_matrix_to_euler(rotmat_recovered)
@@ -193,6 +198,10 @@ class RobotEnv:
 
 
         # 根据末端执行器位姿（3位末端位置，3位末端旋转），移动机械臂
+        if initial_step:
+            print("Initial move")
+            print(target_pose)
+            time.sleep(3)
         self.robot.move(target_pose)
 
         # 根据夹爪状态，控制夹爪
@@ -207,7 +216,7 @@ class RobotEnv:
         #         'qpos': None  # 需要根据具体环境实现，应该是一个包含关节位置的数组
         #     }
         # }
-        obs = np.concatenate([proprio.copy(), gripper_state])
+        obs = np.concatenate([proprio.copy(), np.array([gripper_state])])
 
 
         #没用，不用管
@@ -284,7 +293,7 @@ class ur5Robot:
 
         #通信
         self.con.get_controller_version()
-        self.con.send_output_setup(self.state_names, self.state_types, self.FREQUENCY)  
+        self.con.send_output_setup(self.state_names, self.state_types)  
         self.setp = self.con.send_input_setup(self.setp_names, self.setp_types)
         self.watchdog = self.con.send_input_setup(self.watchdog_names, self.watchdog_types)
 
@@ -303,7 +312,7 @@ class ur5Robot:
          
 
     
-    def move(self, target_pose, trajectory_time=2, speed=0.25, acceleration=0.5):
+    def move(self, target_pose, trajectory_time=8):
         """
         笛卡尔空间直线运动
         Args:
@@ -326,6 +335,9 @@ class ur5Robot:
         #指定伺服模式
         self.watchdog.input_int_register_0 = 2
         self.con.send(self.watchdog)
+        state = self.con.receive()
+        print("Watchdog sent")
+        # time.sleep(3)
 
         # 路径规划器
         planner = PathPlanTranslation(tcp, target_pose, trajectory_time)
@@ -334,19 +346,22 @@ class ur5Robot:
         t_start = time.time()
         while time.time() - t_start < trajectory_time:
             state = self.con.receive()
+            print(f'state. runtime_state: {state.runtime_state}')
             t_current = time.time() - t_start
 
             if state.runtime_state > 1 and t_current <= trajectory_time:
+            # if t_current <= trajectory_time:
                 position_ref, lin_vel_ref, acceleration_ref = planner.trajectory_planning(t_current)
                 pose = position_ref.tolist() + orientation_const
                 self.list_to_setp(self.setp, pose)
+                print(f"Sending setp: {pose}")
                 self.con.send(self.setp)
 
         # 打印
         print(f"It took {time.time()-t_start}s to execute the servoJ to point 1")
         print('Final TCP pose:', self.con.receive().actual_TCP_pose)
 
-        self.stop()
+        # self.stop()
 
         pass
     
@@ -684,45 +699,69 @@ class Gripper:
 
 
 if __name__ == "__main__":
+    # setp2 = [-0.077, -0.636, 0.541, 2.778, -0.994, 0.047]
+    # setp1 = [-0.553, -0.0188, 0.36397, 1.266, -2.572, -0.049]
+    setp1 = [-0.077, -0.636, 0.541, 0,0,0,0,0,0,1]
+    setp2 = [-0.553, -0.0188, 0.36397, 0,0,0,0,0,0,0]
+
+    setp1 = np.array(setp1)
+    setp2 = np.array(setp2)
+
+    # robot = ur5Robot('192.168.0.201')
+    # robot.move(setp1,trajectory_time=8)
+    # robot.move(setp2,trajectory_time=8)
+    robot_environment = RobotEnv()
+    robot_environment.reset()
+    robot_environment.step(setp2)
+    robot_environment.step(setp1)
+
+    
+    # robot = ur5Robot('192.168.0.201')
+    # robot.move(np.array([-1.6307831e-04, -8.9645386e-05, -6.9618225e-05, -5.8174133e-05,
+    #             -9.1075897e-05,  2.4795532e-05,  1.4495850e-04, -3.2615662e-04,
+    #             -1.5068054e-04]))
+
+    # target_pose = [-0.553, -0.0188, 0.36397, 1.266, -2.572, -0.049]
+    # robot.move(target_pose,trajectory_time=8)
 
 
     # robot = ur5Robot('192.168.0.201')
     # target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
     # robot.move(target_pose,trajectory_time=8)
 
-    gripper = Gripper()
-    print(gripper.rad2byte(5.3*3.14*2*0.9))
-    time.sleep(5)
-    gripper.grasp()
-    print(0)
+    # gripper = Gripper()
+    # print(gripper.rad2byte(5.3*3.14*2*0.9))
+    # time.sleep(5)
+    # gripper.grasp()
+    # print(0)
 
 
-    # high_byte, low_byte = gripper.rad2byte(1800)
-    time.sleep(5)
-    gripper.close()
-    print(1)
-    time.sleep(5)
-    gripper.open()
-    print(2)
-    time.sleep(5)
-    gripper.close()
-    print(3)
-    time.sleep(5)
-    gripper.open()
-    print(4)
-    time.sleep(5)
+    # # high_byte, low_byte = gripper.rad2byte(1800)
+    # time.sleep(5)
+    # gripper.close()
+    # print(1)
+    # time.sleep(5)
+    # gripper.open()
+    # print(2)
+    # time.sleep(5)
+    # gripper.close()
+    # print(3)
+    # time.sleep(5)
+    # gripper.open()
+    # print(4)
+    # time.sleep(5)
 
-    for i in range(10):
-        gripper.close()
-        time.sleep(5)
-        gripper.grasp()
-        time.sleep(5)
-        gripper.open()
-        time.sleep(5)
-        gripper.grasp()
-        time.sleep(5)
-        gripper.close()
-        time.sleep(5)
+    # for i in range(10):
+    #     gripper.close()
+    #     time.sleep(5)
+    #     gripper.grasp()
+    #     time.sleep(5)
+    #     gripper.open()
+    #     time.sleep(5)
+    #     gripper.grasp()
+    #     time.sleep(5)
+    #     gripper.close()
+    #     time.sleep(5)
 
     # target_pose = [-0.503, -0.0088, 0.31397, 1.266, -2.572, -0.049]
     # robot.move(target_pose,trajectory_time=8)

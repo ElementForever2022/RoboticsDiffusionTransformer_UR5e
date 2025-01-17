@@ -156,6 +156,11 @@ for episode in tqdm.trange(total_episodes):
     #是否结束当前评估
     done = False
 
+    action = [-0.503, -0.0088, 0.31397, -0.84110996 ,0.0412474 , 0.53928906 ,-0.49911578 ,0.32493579 ,-0.80330577,1]
+    action = np.array(action)
+    observed_state, _reward, terminated, truncated, info = robotEnv.step(action)
+
+    """
     #跑一次评估，需要多步
     while global_steps < MAX_EPISODE_STEPS and not done:
         image_arrs = []
@@ -174,12 +179,20 @@ for episode in tqdm.trange(total_episodes):
         actions = actions[::4, :]
 
         # 执行动作数组中的每一个动作
+    """
+
+    """
         for idx in range(actions.shape[0]):
             action = actions[idx]
             # obs, reward, terminated, truncated, info = env.step(action)
 
             #执行
-            observed_state, _reward, terminated, truncated, info = robotEnv.step(action)
+            initial_step = False
+            if global_steps == 0:
+                initial_step = True
+                print('=*'*20)
+                print("Initial action")
+            observed_state, _reward, terminated, truncated, info = robotEnv.step(action,initial_step=initial_step)
 
             # img = env.render().squeeze(0).detach().cpu().numpy()
             img = robotEnv.shootImage()
@@ -187,6 +200,7 @@ for episode in tqdm.trange(total_episodes):
             proprio = observed_state.clone()
             video_frames.append(img)
             global_steps += 1
+        
 
             #仿真环境中任务有成功条件，可以自动判断成功。但实机中需要人为判断是否成功
             # # check if the task is done
@@ -213,7 +227,7 @@ for episode in tqdm.trange(total_episodes):
                 ifSuccess = False
                 done = True
                 break
-
+        """
 
     print(f"Trial {episode+1} finished, success: {ifSuccess}, steps: {global_steps}")
 
